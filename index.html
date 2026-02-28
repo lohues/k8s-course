@@ -1,0 +1,672 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Kubernetes Crash Course</title>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;600;700&family=Syne:wght@400;600;700;800&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #07090f;
+    --sidebar-bg: #0a0e1a;
+    --surface: #0f1525;
+    --surface2: #161d33;
+    --border: #1e2a47;
+    --accent1: #f97316;
+    --accent2: #00d4ff;
+    --accent3: #7c3aed;
+    --accent4: #2dd4bf;
+    --accent5: #c084fc;
+    --green: #10b981;
+    --text: #e2e8f0;
+    --muted: #64748b;
+    --sidebar-w: 320px;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Syne', sans-serif;
+    line-height: 1.6;
+    height: 100vh;
+    overflow: hidden;
+    display: flex;
+  }
+
+  /* ── Sidebar ── */
+  .sidebar {
+    width: var(--sidebar-w);
+    min-width: var(--sidebar-w);
+    height: 100vh;
+    background: var(--sidebar-bg);
+    border-right: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    transition: transform 0.3s ease;
+    z-index: 50;
+  }
+
+  .sidebar-header {
+    padding: 1.5rem 1.25rem 1rem;
+    border-bottom: 1px solid var(--border);
+    flex-shrink: 0;
+  }
+
+  .sidebar-header .logo {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    text-decoration: none;
+    cursor: pointer;
+  }
+
+  .sidebar-header .logo-icon {
+    width: 36px;
+    height: 36px;
+    border-radius: 10px;
+    background: linear-gradient(135deg, var(--accent2), var(--accent3));
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.1rem;
+    flex-shrink: 0;
+  }
+
+  .sidebar-header h1 {
+    font-size: 1rem;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+    color: var(--text);
+    line-height: 1.2;
+  }
+
+  .sidebar-header h1 span {
+    display: block;
+    font-size: 0.65rem;
+    font-weight: 400;
+    color: var(--muted);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    margin-top: 2px;
+  }
+
+  .sidebar-nav {
+    flex: 1;
+    overflow-y: auto;
+    padding: 0.75rem 0;
+    scrollbar-width: thin;
+    scrollbar-color: var(--border) transparent;
+  }
+
+  .sidebar-nav::-webkit-scrollbar { width: 4px; }
+  .sidebar-nav::-webkit-scrollbar-track { background: transparent; }
+  .sidebar-nav::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
+
+  /* Stage group */
+  .stage-group { margin-bottom: 0.25rem; }
+
+  .stage-btn {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.7rem 1.25rem;
+    background: none;
+    border: none;
+    color: var(--text);
+    font-family: 'Syne', sans-serif;
+    font-size: 0.82rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.15s;
+    text-align: left;
+    position: relative;
+  }
+
+  .stage-btn:hover { background: rgba(255,255,255,0.03); }
+  .stage-btn.active { background: rgba(255,255,255,0.05); }
+
+  .stage-btn .stage-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+
+  .stage-btn .chevron {
+    margin-left: auto;
+    font-size: 0.65rem;
+    color: var(--muted);
+    transition: transform 0.2s;
+    flex-shrink: 0;
+  }
+
+  .stage-btn.expanded .chevron { transform: rotate(90deg); }
+
+  .stage-sections {
+    max-height: 0;
+    overflow: hidden;
+    transition: max-height 0.3s ease;
+  }
+
+  .stage-sections.open { max-height: 600px; }
+
+  .section-link {
+    display: block;
+    padding: 0.35rem 1.25rem 0.35rem 2.75rem;
+    font-size: 0.72rem;
+    color: var(--muted);
+    text-decoration: none;
+    cursor: pointer;
+    transition: color 0.15s, background 0.15s;
+    font-family: 'JetBrains Mono', monospace;
+    font-weight: 400;
+    border-left: 2px solid transparent;
+  }
+
+  .section-link:hover {
+    color: var(--text);
+    background: rgba(255,255,255,0.02);
+  }
+
+  .section-link.active {
+    color: var(--accent2);
+    border-left-color: var(--accent2);
+    background: rgba(0,212,255,0.04);
+  }
+
+  /* Progress bar at bottom of sidebar */
+  .sidebar-footer {
+    padding: 1rem 1.25rem;
+    border-top: 1px solid var(--border);
+    flex-shrink: 0;
+  }
+
+  .progress-label {
+    font-size: 0.65rem;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    margin-bottom: 0.5rem;
+    display: flex;
+    justify-content: space-between;
+  }
+
+  .progress-track {
+    height: 4px;
+    background: var(--border);
+    border-radius: 4px;
+    overflow: hidden;
+    display: flex;
+    gap: 2px;
+  }
+
+  .progress-segment {
+    flex: 1;
+    border-radius: 2px;
+    transition: background 0.3s;
+  }
+
+  /* ── Main Content ── */
+  .main {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    position: relative;
+  }
+
+  .topbar {
+    display: flex;
+    align-items: center;
+    padding: 0 1.5rem;
+    height: 52px;
+    border-bottom: 1px solid var(--border);
+    background: var(--sidebar-bg);
+    flex-shrink: 0;
+    gap: 1rem;
+  }
+
+  .menu-toggle {
+    display: none;
+    background: none;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    color: var(--text);
+    padding: 0.4rem 0.5rem;
+    cursor: pointer;
+    font-size: 1rem;
+    line-height: 1;
+  }
+
+  .topbar-title {
+    font-size: 0.78rem;
+    color: var(--muted);
+    font-family: 'JetBrains Mono', monospace;
+  }
+
+  .topbar-nav {
+    margin-left: auto;
+    display: flex;
+    gap: 0.4rem;
+  }
+
+  .topbar-nav button {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    color: var(--muted);
+    border-radius: 6px;
+    padding: 0.3rem 0.7rem;
+    font-size: 0.72rem;
+    cursor: pointer;
+    font-family: 'JetBrains Mono', monospace;
+    transition: all 0.15s;
+  }
+
+  .topbar-nav button:hover {
+    color: var(--text);
+    border-color: var(--muted);
+  }
+
+  .topbar-nav button:disabled {
+    opacity: 0.3;
+    cursor: not-allowed;
+  }
+
+  .content-frame {
+    flex: 1;
+    border: none;
+    width: 100%;
+    height: 100%;
+    background: var(--bg);
+  }
+
+  /* ── Welcome Screen ── */
+  .welcome {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 3rem;
+    overflow-y: auto;
+  }
+
+  .welcome-inner {
+    max-width: 720px;
+    text-align: center;
+  }
+
+  .welcome-icon {
+    width: 80px;
+    height: 80px;
+    border-radius: 20px;
+    background: linear-gradient(135deg, var(--accent2), var(--accent3));
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 2.2rem;
+    margin-bottom: 2rem;
+    box-shadow: 0 0 60px rgba(0,212,255,0.15);
+  }
+
+  .welcome h2 {
+    font-size: 2rem;
+    font-weight: 800;
+    margin-bottom: 0.5rem;
+    background: linear-gradient(135deg, var(--text), var(--accent2));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+
+  .welcome p {
+    color: var(--muted);
+    font-size: 0.95rem;
+    margin-bottom: 2.5rem;
+    line-height: 1.7;
+  }
+
+  .stage-cards {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 0.75rem;
+    text-align: left;
+  }
+
+  .stage-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 1.25rem;
+    cursor: pointer;
+    transition: all 0.2s;
+    text-decoration: none;
+    display: block;
+  }
+
+  .stage-card:hover {
+    border-color: var(--muted);
+    transform: translateY(-2px);
+    box-shadow: 0 8px 30px rgba(0,0,0,0.3);
+  }
+
+  .stage-card .card-stage {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.6rem;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    margin-bottom: 0.5rem;
+    font-weight: 600;
+  }
+
+  .stage-card .card-title {
+    font-size: 0.88rem;
+    font-weight: 700;
+    color: var(--text);
+    margin-bottom: 0.4rem;
+  }
+
+  .stage-card .card-desc {
+    font-size: 0.7rem;
+    color: var(--muted);
+    line-height: 1.5;
+  }
+
+  .stage-card .card-sections {
+    margin-top: 0.75rem;
+    font-size: 0.62rem;
+    color: var(--muted);
+    font-family: 'JetBrains Mono', monospace;
+  }
+
+  /* ── Overlay for mobile ── */
+  .sidebar-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.6);
+    z-index: 40;
+  }
+
+  .sidebar-overlay.visible { display: block; }
+
+  /* ── Responsive ── */
+  @media (max-width: 768px) {
+    .sidebar {
+      position: fixed;
+      left: 0;
+      top: 0;
+      transform: translateX(-100%);
+    }
+    .sidebar.open { transform: translateX(0); }
+    .menu-toggle { display: block; }
+  }
+</style>
+</head>
+<body>
+
+<div class="sidebar-overlay" id="overlay"></div>
+
+<aside class="sidebar" id="sidebar">
+  <div class="sidebar-header">
+    <div class="logo" onclick="showWelcome()">
+      <div class="logo-icon">&#9781;</div>
+      <h1>Kubernetes<span>Crash Course &middot; 5 Stages</span></h1>
+    </div>
+  </div>
+
+  <nav class="sidebar-nav" id="sidebarNav"></nav>
+
+  <div class="sidebar-footer">
+    <div class="progress-label">
+      <span>Course Progress</span>
+      <span id="progressPct">0 / 5</span>
+    </div>
+    <div class="progress-track" id="progressTrack"></div>
+  </div>
+</aside>
+
+<div class="main">
+  <div class="topbar">
+    <button class="menu-toggle" id="menuToggle" aria-label="Toggle menu">&#9776;</button>
+    <span class="topbar-title" id="topbarTitle">Home</span>
+    <div class="topbar-nav">
+      <button id="prevBtn" onclick="navigate(-1)" disabled>&larr; Prev</button>
+      <button id="nextBtn" onclick="navigate(1)">Next &rarr;</button>
+    </div>
+  </div>
+
+  <div class="welcome" id="welcomeScreen">
+    <div class="welcome-inner">
+      <div class="welcome-icon">&#9781;</div>
+      <h2>Kubernetes Crash Course</h2>
+      <p>A comprehensive, hands-on journey from zero to production-ready Kubernetes across 5 progressive stages. Pick a stage to begin, or start from Stage 1 if you're new.</p>
+      <div class="stage-cards" id="stageCards"></div>
+    </div>
+  </div>
+
+  <iframe class="content-frame" id="contentFrame" style="display:none" sandbox="allow-scripts allow-same-origin"></iframe>
+</div>
+
+<script>
+const STAGES = [
+  {
+    id: 1,
+    title: 'Prerequisites',
+    file: 'k8s-stage1-crash-course.html',
+    color: '#f97316',
+    desc: 'Linux, Docker, Networking, YAML & CLI fundamentals',
+    sections: [
+      'Linux Basics',
+      'Docker & Containers',
+      'Networking Fundamentals',
+      'YAML',
+      'CLI Productivity',
+      'Hands-On Lab'
+    ]
+  },
+  {
+    id: 2,
+    title: 'Core Concepts',
+    file: 'k8s-stage2-crash-course.html',
+    color: '#00d4ff',
+    desc: 'Pods, Deployments, Services, kubectl & ConfigMaps',
+    sections: [
+      'Why Kubernetes?',
+      'Cluster Architecture',
+      'Core Kubernetes Objects',
+      'The kubectl CLI',
+      'ConfigMaps & Secrets',
+      'Labels, Selectors & Annotations',
+      'Hands-On Lab'
+    ]
+  },
+  {
+    id: 3,
+    title: 'Intermediate',
+    file: 'k8s-stage3-crash-course.html',
+    color: '#7c3aed',
+    desc: 'Scheduling, Storage, Ingress, Workloads, RBAC & Probes',
+    sections: [
+      'Scheduling',
+      'Storage: PV, PVC & StorageClass',
+      'Networking & Ingress',
+      'Workload Types',
+      'Health Probes',
+      'Resource Management',
+      'RBAC',
+      'Hands-On Lab'
+    ]
+  },
+  {
+    id: 4,
+    title: 'Real-World Ops',
+    file: 'k8s-stage4-crash-course.html',
+    color: '#2dd4bf',
+    desc: 'Helm, CI/CD, ArgoCD, Monitoring & Auto-Scaling',
+    sections: [
+      'Helm',
+      'CI/CD Integration',
+      'GitOps with ArgoCD',
+      'Monitoring & Logging',
+      'Auto-Scaling: HPA & VPA',
+      'Multi-Environment Management',
+      'Managed Kubernetes',
+      'Hands-On Lab'
+    ]
+  },
+  {
+    id: 5,
+    title: 'Advanced',
+    file: 'k8s-stage5-crash-course.html',
+    color: '#c084fc',
+    desc: 'kubeadm, CRDs, Istio, Security, etcd & Multi-Cluster',
+    sections: [
+      'Cluster Bootstrap with kubeadm',
+      'CRDs & Operators',
+      'Service Mesh with Istio',
+      'Advanced Security Hardening',
+      'etcd Operations',
+      'Multi-Cluster Management',
+      'Advanced Debugging Techniques',
+      'Hands-On Lab'
+    ]
+  }
+];
+
+let currentStage = null;
+const visited = new Set(JSON.parse(localStorage.getItem('k8s_visited') || '[]'));
+
+function saveVisited() {
+  localStorage.setItem('k8s_visited', JSON.stringify([...visited]));
+}
+
+// Build sidebar
+function buildSidebar() {
+  const nav = document.getElementById('sidebarNav');
+  nav.innerHTML = STAGES.map(s => `
+    <div class="stage-group" data-stage="${s.id}">
+      <button class="stage-btn" onclick="toggleStage(${s.id})" id="stageBtn${s.id}">
+        <span class="stage-dot" style="background:${s.color}"></span>
+        Stage ${s.id} — ${s.title}
+        <span class="chevron">&#9654;</span>
+      </button>
+      <div class="stage-sections" id="stageSections${s.id}">
+        ${s.sections.map((sec, i) => `
+          <a class="section-link" onclick="loadStage(${s.id})" data-stage="${s.id}" data-section="${i}">${sec}</a>
+        `).join('')}
+      </div>
+    </div>
+  `).join('');
+}
+
+function toggleStage(id) {
+  const btn = document.getElementById(`stageBtn${id}`);
+  const sections = document.getElementById(`stageSections${id}`);
+  const isOpen = sections.classList.contains('open');
+
+  document.querySelectorAll('.stage-sections').forEach(s => s.classList.remove('open'));
+  document.querySelectorAll('.stage-btn').forEach(b => b.classList.remove('expanded'));
+
+  if (!isOpen) {
+    sections.classList.add('open');
+    btn.classList.add('expanded');
+  }
+}
+
+function loadStage(id) {
+  const stage = STAGES.find(s => s.id === id);
+  if (!stage) return;
+  currentStage = id;
+
+  visited.add(id);
+  saveVisited();
+  updateProgress();
+
+  document.getElementById('welcomeScreen').style.display = 'none';
+  const frame = document.getElementById('contentFrame');
+  frame.style.display = 'block';
+  frame.src = stage.file;
+  document.getElementById('topbarTitle').textContent = `Stage ${id} — ${stage.title}`;
+
+  document.querySelectorAll('.stage-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById(`stageBtn${id}`).classList.add('active');
+
+  toggleStage(id);
+  updateNavBtns();
+  closeMobile();
+}
+
+function showWelcome() {
+  currentStage = null;
+  document.getElementById('welcomeScreen').style.display = 'flex';
+  document.getElementById('contentFrame').style.display = 'none';
+  document.getElementById('topbarTitle').textContent = 'Home';
+  document.querySelectorAll('.stage-btn').forEach(b => b.classList.remove('active'));
+  updateNavBtns();
+  closeMobile();
+}
+
+function navigate(dir) {
+  if (!currentStage) {
+    if (dir === 1) loadStage(1);
+    return;
+  }
+  const next = currentStage + dir;
+  if (next >= 1 && next <= STAGES.length) loadStage(next);
+}
+
+function updateNavBtns() {
+  document.getElementById('prevBtn').disabled = currentStage === null || currentStage <= 1;
+  document.getElementById('nextBtn').disabled = currentStage !== null && currentStage >= STAGES.length;
+}
+
+function updateProgress() {
+  const pct = document.getElementById('progressPct');
+  pct.textContent = `${visited.size} / ${STAGES.length}`;
+  const track = document.getElementById('progressTrack');
+  track.innerHTML = STAGES.map(s => `
+    <div class="progress-segment" style="background:${visited.has(s.id) ? s.color : 'var(--border)'}"></div>
+  `).join('');
+}
+
+// Build welcome cards
+function buildWelcomeCards() {
+  const container = document.getElementById('stageCards');
+  container.innerHTML = STAGES.map(s => `
+    <div class="stage-card" onclick="loadStage(${s.id})">
+      <div class="card-stage" style="color:${s.color}">Stage ${s.id}</div>
+      <div class="card-title">${s.title}</div>
+      <div class="card-desc">${s.desc}</div>
+      <div class="card-sections">${s.sections.length} sections</div>
+    </div>
+  `).join('');
+}
+
+// Mobile menu
+const menuToggle = document.getElementById('menuToggle');
+const sidebar = document.getElementById('sidebar');
+const overlay = document.getElementById('overlay');
+
+menuToggle.addEventListener('click', () => {
+  sidebar.classList.toggle('open');
+  overlay.classList.toggle('visible');
+});
+
+overlay.addEventListener('click', closeMobile);
+
+function closeMobile() {
+  sidebar.classList.remove('open');
+  overlay.classList.remove('visible');
+}
+
+// Init
+buildSidebar();
+buildWelcomeCards();
+updateProgress();
+updateNavBtns();
+</script>
+</body>
+</html>
