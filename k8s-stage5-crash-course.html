@@ -1,0 +1,1540 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Kubernetes Stage 5 — Advanced Crash Course</title>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;600;700&family=Syne:wght@400;600;700;800&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg:      #0a0916;
+    --surface: #0f0d1f;
+    --surface2:#161428;
+    --border:  #251f3e;
+    --accent:  #c084fc;  /* purple */
+    --accent2: #f472b6;  /* pink/magenta */
+    --accent3: #818cf8;  /* indigo */
+    --accent4: #34d399;  /* emerald */
+    --accent5: #fbbf24;  /* amber */
+    --text:    #e2e8f0;
+    --muted:   #64748b;
+    --danger:  #f87171;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Syne', sans-serif;
+    line-height: 1.7;
+    overflow-x: hidden;
+  }
+
+  body::before {
+    content: '';
+    position: fixed; inset: 0;
+    background:
+      radial-gradient(ellipse 70% 50% at 10% 10%, rgba(192,132,252,0.08) 0%, transparent 55%),
+      radial-gradient(ellipse 60% 45% at 90% 80%, rgba(244,114,182,0.07) 0%, transparent 55%);
+    pointer-events: none; z-index: 0;
+  }
+
+  .container { max-width: 960px; margin: 0 auto; padding: 0 2rem; position: relative; z-index: 1; }
+
+  /* PROGRESS */
+  .progress-bar-container { position: fixed; top: 0; left: 0; right: 0; height: 2px; background: var(--border); z-index: 100; }
+  #progress-bar { height: 100%; background: linear-gradient(90deg, var(--accent), var(--accent2)); width: 0%; transition: width 0.1s; }
+
+  /* HEADER */
+  header { padding: 5rem 0 4rem; border-bottom: 1px solid var(--border); }
+
+  .stage-nav { display: flex; gap: 0.5rem; margin-bottom: 2rem; flex-wrap: wrap; }
+  .stage-pill { font-family: 'JetBrains Mono', monospace; font-size: 0.65rem; letter-spacing: 0.1em; padding: 0.3rem 0.75rem; border-radius: 20px; border: 1px solid var(--border); color: var(--muted); }
+  .stage-pill.active { border-color: rgba(192,132,252,0.5); background: rgba(192,132,252,0.08); color: var(--accent); }
+
+  .badge {
+    display: inline-flex; align-items: center; gap: 0.5rem;
+    background: rgba(192,132,252,0.08); border: 1px solid rgba(192,132,252,0.3); color: var(--accent);
+    font-family: 'JetBrains Mono', monospace; font-size: 0.7rem; letter-spacing: 0.15em; text-transform: uppercase;
+    padding: 0.35rem 0.9rem; border-radius: 2px; margin-bottom: 2rem;
+    animation: glow 3s ease-in-out infinite;
+  }
+  @keyframes glow { 0%,100%{box-shadow:none} 50%{box-shadow:0 0 16px rgba(192,132,252,0.25)} }
+  .badge::before { content: '●'; color: var(--accent2); font-size: 0.6rem; animation: blink 1.5s step-end infinite; }
+  @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0} }
+
+  h1 { font-size: clamp(2.4rem,5vw,4rem); font-weight: 800; letter-spacing: -0.02em; line-height: 1.1; margin-bottom: 1.5rem; }
+  h1 .purple { color: var(--accent); }
+  h1 .pink   { color: var(--accent2); }
+
+  .subtitle { font-size: 1.05rem; color: var(--muted); max-width: 640px; font-weight: 400; line-height: 1.75; }
+
+  .meta-bar { display: flex; gap: 2rem; margin-top: 2.5rem; flex-wrap: wrap; }
+  .meta-item { display: flex; align-items: center; gap: 0.5rem; font-family: 'JetBrains Mono', monospace; font-size: 0.75rem; color: var(--muted); }
+  .dot { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; }
+
+  /* TOC */
+  .toc { background: var(--surface); border: 1px solid var(--border); border-left: 3px solid var(--accent); padding: 2rem; margin: 3rem 0; border-radius: 0 4px 4px 0; }
+  .toc-title { font-family: 'JetBrains Mono', monospace; font-size: 0.7rem; letter-spacing: 0.2em; text-transform: uppercase; color: var(--accent); margin-bottom: 1.2rem; }
+  .toc-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px,1fr)); gap: 0.4rem; }
+  .toc-link { color: var(--muted); text-decoration: none; font-size: 0.85rem; padding: 0.3rem 0; display: flex; align-items: center; gap: 0.5rem; transition: color 0.2s; }
+  .toc-link:hover { color: var(--accent); }
+  .toc-link::before { content: '→'; font-size: 0.7rem; opacity: 0.5; }
+
+  /* SECTIONS */
+  section { padding: 4rem 0; border-bottom: 1px solid var(--border); opacity: 0; transform: translateY(20px); transition: opacity 0.5s ease, transform 0.5s ease; }
+  section.visible { opacity: 1; transform: translateY(0); }
+
+  .section-num { font-family: 'JetBrains Mono', monospace; font-size: 0.7rem; color: var(--accent); letter-spacing: 0.2em; text-transform: uppercase; margin-bottom: 0.5rem; }
+
+  h2 { font-size: clamp(1.6rem,3vw,2.2rem); font-weight: 700; margin-bottom: 1.5rem; letter-spacing: -0.01em; }
+  h3 { font-size: 1.05rem; font-weight: 600; color: var(--accent); margin: 2.5rem 0 0.75rem; font-family: 'JetBrains Mono', monospace; }
+  h4 { font-size: 0.95rem; font-weight: 600; color: var(--text); margin: 1.5rem 0 0.5rem; }
+  p  { color: #94a3b8; margin-bottom: 1rem; font-size: 0.95rem; line-height: 1.75; }
+  strong { color: var(--text); font-weight: 600; }
+
+  code { font-family: 'JetBrains Mono', monospace; font-size: 0.82em; color: var(--accent); background: rgba(192,132,252,0.08); padding: 0.1rem 0.35rem; border-radius: 3px; }
+
+  /* CODE BLOCKS */
+  .code-block { background: #07050f; border: 1px solid var(--border); border-radius: 6px; margin: 1.5rem 0; overflow: hidden; }
+  .code-header { display: flex; justify-content: space-between; align-items: center; padding: 0.6rem 1rem; background: var(--surface2); border-bottom: 1px solid var(--border); }
+  .code-lang { font-family: 'JetBrains Mono', monospace; font-size: 0.65rem; letter-spacing: 0.15em; text-transform: uppercase; color: var(--muted); }
+  .code-dots { display: flex; gap: 5px; }
+  .code-dots span { width: 8px; height: 8px; border-radius: 50%; }
+  .code-dots span:nth-child(1) { background: #ff5f56; }
+  .code-dots span:nth-child(2) { background: #ffbd2e; }
+  .code-dots span:nth-child(3) { background: #27c93f; }
+
+  pre { padding: 1.5rem; overflow-x: auto; font-family: 'JetBrains Mono', monospace; font-size: 0.8rem; line-height: 1.85; }
+
+  /* Syntax colors */
+  .k  { color: #c084fc; }   /* purple — yaml key / keyword */
+  .v  { color: #86efac; }   /* green — value / string */
+  .n  { color: #fbbf24; }   /* amber — number */
+  .c  { color: #2e2a4a; font-style: italic; } /* comment */
+  .cm { color: #34d399; }   /* command */
+  .fl { color: #f9a8d4; }   /* flag */
+  .hl { color: #818cf8; }   /* indigo highlight / keyword */
+  .wt { color: #e2e8f0; }   /* white text */
+  .err{ color: #f87171; }   /* error */
+  .out{ color: #475569; }   /* output / dim */
+  .em { color: #f472b6; }   /* pink emphasis */
+  .go { color: #93c5fd; }   /* go code */
+
+  /* CALLOUTS */
+  .callout { border-left: 3px solid; padding: 1rem 1.5rem; margin: 1.5rem 0; border-radius: 0 6px 6px 0; font-size: 0.88rem; }
+  .callout.tip    { border-color: var(--accent4); background: rgba(52,211,153,0.05); }
+  .callout.warn   { border-color: var(--accent5); background: rgba(251,191,36,0.05); }
+  .callout.info   { border-color: var(--accent3); background: rgba(129,140,248,0.05); }
+  .callout.purple { border-color: var(--accent);  background: rgba(192,132,252,0.05); }
+  .callout.pink   { border-color: var(--accent2); background: rgba(244,114,182,0.05); }
+  .callout-label { font-family: 'JetBrains Mono', monospace; font-size: 0.65rem; letter-spacing: 0.15em; text-transform: uppercase; margin-bottom: 0.4rem; font-weight: 700; }
+  .callout.tip    .callout-label { color: var(--accent4); }
+  .callout.warn   .callout-label { color: var(--accent5); }
+  .callout.info   .callout-label { color: var(--accent3); }
+  .callout.purple .callout-label { color: var(--accent); }
+  .callout.pink   .callout-label { color: var(--accent2); }
+  .callout p { color: #94a3b8; margin: 0; }
+
+  /* TABLES */
+  .data-table { width: 100%; border-collapse: collapse; margin: 1.5rem 0; font-size: 0.82rem; }
+  .data-table th { font-family: 'JetBrains Mono', monospace; font-size: 0.65rem; letter-spacing: 0.15em; text-transform: uppercase; color: var(--muted); text-align: left; padding: 0.6rem 1rem; border-bottom: 1px solid var(--border); background: var(--surface); }
+  .data-table td { padding: 0.75rem 1rem; border-bottom: 1px solid rgba(37,31,62,0.7); color: #94a3b8; vertical-align: top; }
+  .data-table tr:hover td { background: rgba(192,132,252,0.02); }
+  .data-table code { color: var(--accent4); background: rgba(52,211,153,0.07); font-size: 0.78rem; padding: 0.15rem 0.4rem; border-radius: 3px; }
+
+  /* TAGS */
+  .tag { display: inline-block; font-family: 'JetBrains Mono', monospace; font-size: 0.65rem; padding: 0.2rem 0.6rem; border-radius: 2px; margin: 0.15rem; letter-spacing: 0.05em; }
+  .tag.purple { background: rgba(192,132,252,0.1); color: var(--accent);  border: 1px solid rgba(192,132,252,0.25); }
+  .tag.pink   { background: rgba(244,114,182,0.1); color: var(--accent2); border: 1px solid rgba(244,114,182,0.2); }
+  .tag.indigo { background: rgba(129,140,248,0.1); color: var(--accent3); border: 1px solid rgba(129,140,248,0.2); }
+  .tag.green  { background: rgba(52,211,153,0.1);  color: var(--accent4); border: 1px solid rgba(52,211,153,0.2); }
+  .tag.amber  { background: rgba(251,191,36,0.1);  color: var(--accent5); border: 1px solid rgba(251,191,36,0.2); }
+  .tag.red    { background: rgba(248,113,113,0.1); color: var(--danger);  border: 1px solid rgba(248,113,113,0.2); }
+
+  /* DIAGRAM */
+  .diagram { background: #07050f; border: 1px solid var(--border); border-radius: 8px; padding: 2rem; margin: 1.5rem 0; font-family: 'JetBrains Mono', monospace; font-size: 0.75rem; overflow-x: auto; }
+  .diagram-label { font-size: 0.62rem; letter-spacing: 0.2em; text-transform: uppercase; color: var(--muted); margin-bottom: 1.5rem; }
+  .d-row { display: flex; align-items: center; gap: 0.75rem; margin-bottom: 0.75rem; flex-wrap: wrap; }
+  .d-col { display: flex; flex-direction: column; gap: 0.4rem; }
+  .d-box { border: 1px solid; border-radius: 5px; padding: 0.6rem 1rem; text-align: center; min-width: 100px; line-height: 1.4; font-size: 0.72rem; }
+  .d-box.purple { border-color: rgba(192,132,252,0.4); background: rgba(192,132,252,0.05); color: var(--accent); }
+  .d-box.pink   { border-color: rgba(244,114,182,0.4); background: rgba(244,114,182,0.05); color: var(--accent2); }
+  .d-box.indigo { border-color: rgba(129,140,248,0.4); background: rgba(129,140,248,0.05); color: var(--accent3); }
+  .d-box.green  { border-color: rgba(52,211,153,0.4);  background: rgba(52,211,153,0.05);  color: var(--accent4); }
+  .d-box.amber  { border-color: rgba(251,191,36,0.4);  background: rgba(251,191,36,0.05);  color: var(--accent5); }
+  .d-box.gray   { border-color: var(--border); background: var(--surface2); color: var(--muted); }
+  .d-arrow { color: var(--muted); font-size: 1rem; flex-shrink: 0; }
+
+  /* CARDS */
+  .card-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px,1fr)); gap: 1rem; margin: 1.5rem 0; }
+  .card { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 1.5rem; transition: border-color 0.2s, transform 0.2s; }
+  .card:hover { border-color: var(--accent); transform: translateY(-2px); }
+  .card-icon { font-size: 1.5rem; margin-bottom: 0.75rem; }
+  .card-name { font-family: 'JetBrains Mono', monospace; font-size: 0.85rem; color: var(--accent); font-weight: 600; margin-bottom: 0.5rem; }
+  .card-desc { font-size: 0.82rem; color: var(--muted); line-height: 1.6; }
+
+  /* CHEAT BOXES */
+  .cheat-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px,1fr)); gap: 1rem; margin: 1.5rem 0; }
+  .cheat-box { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; overflow: hidden; }
+  .cheat-box.purple-top { border-top: 2px solid var(--accent); }
+  .cheat-box.pink-top   { border-top: 2px solid var(--accent2); }
+  .cheat-box.indigo-top { border-top: 2px solid var(--accent3); }
+  .cheat-box.green-top  { border-top: 2px solid var(--accent4); }
+  .cheat-box.amber-top  { border-top: 2px solid var(--accent5); }
+  .cheat-box-title { font-family: 'JetBrains Mono', monospace; font-size: 0.65rem; letter-spacing: 0.18em; text-transform: uppercase; padding: 0.6rem 1rem; background: var(--surface2); border-bottom: 1px solid var(--border); }
+  .cheat-box.purple-top .cheat-box-title { color: var(--accent); }
+  .cheat-box.pink-top   .cheat-box-title { color: var(--accent2); }
+  .cheat-box.indigo-top .cheat-box-title { color: var(--accent3); }
+  .cheat-box.green-top  .cheat-box-title { color: var(--accent4); }
+  .cheat-box.amber-top  .cheat-box-title { color: var(--accent5); }
+  .cheat-row { display: flex; align-items: baseline; gap: 0.75rem; padding: 0.45rem 1rem; border-bottom: 1px solid rgba(37,31,62,0.5); font-size: 0.78rem; }
+  .cheat-row:last-child { border-bottom: none; }
+  .cheat-cmd { font-family: 'JetBrains Mono', monospace; color: var(--accent4); white-space: nowrap; min-width: 130px; flex-shrink: 0; font-size: 0.75rem; }
+  .cheat-desc { color: var(--muted); line-height: 1.4; }
+
+  /* COMPARE */
+  .compare { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin: 1.5rem 0; }
+  .compare-col { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 1.25rem; }
+  .compare-col.purple-t { border-top: 2px solid var(--accent); }
+  .compare-col.pink-t   { border-top: 2px solid var(--accent2); }
+  .compare-col.green-t  { border-top: 2px solid var(--accent4); }
+  .compare-col-title { font-family: 'JetBrains Mono', monospace; font-size: 0.7rem; letter-spacing: 0.15em; text-transform: uppercase; margin-bottom: 1rem; padding-bottom: 0.75rem; border-bottom: 1px solid var(--border); }
+  .compare-col.purple-t .compare-col-title { color: var(--accent); }
+  .compare-col.pink-t   .compare-col-title { color: var(--accent2); }
+  .compare-col.green-t  .compare-col-title { color: var(--accent4); }
+  .compare-item { display: flex; align-items: flex-start; gap: 0.5rem; margin-bottom: 0.5rem; font-size: 0.82rem; color: #94a3b8; }
+  .compare-item::before { content: '·'; color: var(--muted); flex-shrink: 0; }
+
+  /* STEPS */
+  .steps { margin: 1.5rem 0; }
+  .step { display: flex; gap: 1.5rem; margin-bottom: 2rem; align-items: flex-start; }
+  .step-num { flex-shrink: 0; width: 36px; height: 36px; border: 2px solid var(--accent); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-family: 'JetBrains Mono', monospace; font-size: 0.8rem; color: var(--accent); font-weight: 700; }
+  .step-content h4 { font-size: 1rem; font-weight: 600; margin-bottom: 0.4rem; }
+  .step-content p  { font-size: 0.85rem; margin: 0 0 0.5rem; }
+
+  /* QUIZ */
+  .quiz { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 2rem; margin: 2rem 0; }
+  .quiz-title { font-family: 'JetBrains Mono', monospace; font-size: 0.7rem; letter-spacing: 0.2em; text-transform: uppercase; color: var(--accent5); margin-bottom: 1.5rem; }
+  .quiz-q { margin-bottom: 1.5rem; }
+  .quiz-q p { color: var(--text); font-weight: 600; font-size: 0.9rem; margin-bottom: 0.75rem; }
+  .quiz-options { display: flex; flex-direction: column; gap: 0.4rem; }
+  .quiz-opt { background: var(--surface2); border: 1px solid var(--border); border-radius: 4px; padding: 0.6rem 1rem; font-size: 0.82rem; cursor: pointer; transition: all 0.15s; color: #94a3b8; text-align: left; font-family: 'Syne', sans-serif; }
+  .quiz-opt:hover { border-color: var(--accent); color: var(--text); }
+  .quiz-opt.correct { border-color: var(--accent4); background: rgba(52,211,153,0.1);  color: var(--accent4); pointer-events: none; }
+  .quiz-opt.wrong   { border-color: var(--danger);  background: rgba(248,113,113,0.1); color: var(--danger);  pointer-events: none; }
+
+  /* TROPHY / COMPLETION */
+  .completion-banner {
+    background: linear-gradient(135deg, rgba(192,132,252,0.1), rgba(244,114,182,0.08));
+    border: 1px solid rgba(192,132,252,0.3);
+    border-radius: 12px; padding: 3rem 2rem; text-align: center; margin: 2rem 0;
+  }
+  .completion-banner .trophy { font-size: 3rem; margin-bottom: 1rem; }
+  .completion-banner h3 { font-size: 1.5rem; color: var(--accent); margin-bottom: 1rem; font-family: 'Syne', sans-serif; }
+  .completion-banner p { color: var(--muted); max-width: 500px; margin: 0 auto; font-size: 0.9rem; }
+
+  footer { padding: 3rem 0; text-align: center; }
+  .footer-text { font-family: 'JetBrains Mono', monospace; font-size: 0.7rem; color: var(--muted); letter-spacing: 0.1em; }
+
+  @media (max-width: 660px) {
+    .compare { grid-template-columns: 1fr; }
+    .card-grid, .cheat-grid { grid-template-columns: 1fr; }
+    .d-row { flex-direction: column; }
+  }
+</style>
+</head>
+<body>
+
+<div class="progress-bar-container"><div id="progress-bar"></div></div>
+
+<!-- ═══════════════════════════════════════════ HEADER -->
+<header>
+  <div class="container">
+    <div class="stage-nav">
+      <div class="stage-pill">Stage 1 · Prerequisites</div>
+      <div class="stage-pill">Stage 2 · Core Concepts</div>
+      <div class="stage-pill">Stage 3 · Intermediate</div>
+      <div class="stage-pill">Stage 4 · Operations</div>
+      <div class="stage-pill active">Stage 5 · Advanced ←</div>
+    </div>
+    <div class="badge">Stage 5 · Advanced</div>
+    <h1>Kubernetes<br><span class="purple">Mastery</span> —<br>the <span class="pink">Final Stage</span></h1>
+    <p class="subtitle">Cluster bootstrap with kubeadm, writing CRDs and Operators in Go, Istio service mesh, advanced security hardening, etcd operations, and multi-cluster management.</p>
+    <div class="meta-bar">
+      <div class="meta-item"><div class="dot" style="background:var(--accent)"></div> 7 Topics</div>
+      <div class="meta-item"><div class="dot" style="background:var(--accent5)"></div> ~6–8 Hours</div>
+      <div class="meta-item"><div class="dot" style="background:var(--accent2)"></div> Expert Level</div>
+      <div class="meta-item"><div class="dot" style="background:var(--accent4)"></div> Requires Stages 1–4</div>
+    </div>
+  </div>
+</header>
+
+<main>
+<div class="container">
+
+  <nav class="toc">
+    <div class="toc-title">// Table of Contents</div>
+    <div class="toc-grid">
+      <a href="#kubeadm"   class="toc-link">Cluster Bootstrap (kubeadm)</a>
+      <a href="#crd"       class="toc-link">CRDs & Operators</a>
+      <a href="#servicemesh" class="toc-link">Service Mesh (Istio)</a>
+      <a href="#security"  class="toc-link">Security Hardening</a>
+      <a href="#etcd"      class="toc-link">etcd Operations</a>
+      <a href="#multicluster" class="toc-link">Multi-Cluster</a>
+      <a href="#debugging" class="toc-link">Advanced Debugging</a>
+      <a href="#hands-on"  class="toc-link">Hands-On Lab</a>
+    </div>
+  </nav>
+
+  <!-- ══════════════════════ SECTION 1: KUBEADM -->
+  <section id="kubeadm">
+    <div class="section-num">// 01</div>
+    <h2>Cluster Bootstrap with kubeadm</h2>
+    <p>Managed K8s (EKS, GKE, AKS) abstracts away the control plane. Understanding how to build a cluster from scratch with <strong>kubeadm</strong> gives you deep insight into every component — and is required for the CKA exam.</p>
+
+    <div class="diagram">
+      <div class="diagram-label">Kubeadm Cluster Architecture — 3 Control Plane + 3 Worker Nodes (HA)</div>
+      <div class="d-row">
+        <div class="d-col">
+          <div class="d-box purple">Control Plane 1<br><small>API Server, Scheduler<br>Controller Manager, etcd</small></div>
+          <div class="d-box purple">Control Plane 2<br><small>API Server, Scheduler<br>Controller Manager, etcd</small></div>
+          <div class="d-box purple">Control Plane 3<br><small>API Server, Scheduler<br>Controller Manager, etcd</small></div>
+        </div>
+        <div class="d-arrow">↔</div>
+        <div class="d-box indigo">Load Balancer<br><small>HAProxy / AWS NLB<br>port 6443</small></div>
+        <div class="d-arrow">↔</div>
+        <div class="d-col">
+          <div class="d-box green">Worker Node 1<br><small>kubelet, kube-proxy<br>containerd</small></div>
+          <div class="d-box green">Worker Node 2<br><small>kubelet, kube-proxy<br>containerd</small></div>
+          <div class="d-box green">Worker Node 3<br><small>kubelet, kube-proxy<br>containerd</small></div>
+        </div>
+      </div>
+    </div>
+
+    <h3>// Prerequisites on Every Node</h3>
+
+    <div class="code-block">
+      <div class="code-header"><div class="code-dots"><span></span><span></span><span></span></div><div class="code-lang">bash · node preparation (run on ALL nodes)</div></div>
+      <pre><span class="c"># Disable swap — K8s requires it off</span>
+<span class="cm">swapoff</span> <span class="fl">-a</span>
+<span class="cm">sed</span> <span class="fl">-i</span> <span class="v">'/ swap / s/^\(.*\)$/#\1/g'</span> /etc/fstab
+
+<span class="c"># Enable required kernel modules</span>
+<span class="cm">cat</span> &gt; /etc/modules-load.d/k8s.conf &lt;&lt;<span class="v">EOF
+overlay
+br_netfilter
+EOF</span>
+<span class="cm">modprobe</span> overlay
+<span class="cm">modprobe</span> br_netfilter
+
+<span class="c"># Kernel networking params for K8s</span>
+<span class="cm">cat</span> &gt; /etc/sysctl.d/k8s.conf &lt;&lt;<span class="v">EOF
+net.bridge.bridge-nf-call-iptables  = 1
+net.bridge.bridge-nf-call-ip6tables = 1
+net.ipv4.ip_forward                 = 1
+EOF</span>
+<span class="cm">sysctl</span> <span class="fl">--system</span>
+
+<span class="c"># Install containerd (container runtime)</span>
+<span class="cm">apt-get</span> install <span class="fl">-y</span> containerd
+<span class="cm">mkdir</span> <span class="fl">-p</span> /etc/containerd
+<span class="cm">containerd</span> config default | <span class="cm">tee</span> /etc/containerd/config.toml
+<span class="c"># Enable systemd cgroup driver (required)</span>
+<span class="cm">sed</span> <span class="fl">-i</span> <span class="v">'s/SystemdCgroup = false/SystemdCgroup = true/'</span> /etc/containerd/config.toml
+<span class="cm">systemctl</span> restart containerd
+
+<span class="c"># Install kubeadm, kubelet, kubectl</span>
+<span class="cm">apt-get</span> install <span class="fl">-y</span> kubeadm kubelet kubectl
+<span class="cm">apt-mark</span> hold kubeadm kubelet kubectl   <span class="c"># prevent auto-upgrade</span></pre>
+    </div>
+
+    <h3>// Bootstrap the First Control Plane</h3>
+
+    <div class="code-block">
+      <div class="code-header"><div class="code-dots"><span></span><span></span><span></span></div><div class="code-lang">bash · kubeadm init (control plane node 1)</div></div>
+      <pre><span class="c"># HA setup: point to load balancer address</span>
+<span class="cm">kubeadm</span> init \
+  <span class="fl">--control-plane-endpoint</span> <span class="v">"lb.example.com:6443"</span> \
+  <span class="fl">--upload-certs</span> \                   <span class="c"># auto-distribute certs to other CPs</span>
+  <span class="fl">--pod-network-cidr</span> <span class="v">10.244.0.0/16</span> \ <span class="c"># match your CNI plugin</span>
+  <span class="fl">--cri-socket</span> unix:///run/containerd/containerd.sock
+
+<span class="c"># Output gives you join commands — save them!</span>
+<span class="out">Your Kubernetes control-plane has initialized successfully!
+...
+kubeadm join lb.example.com:6443 --token abc.xyz \
+  --discovery-token-ca-cert-hash sha256:... \
+  --control-plane --certificate-key &lt;key&gt;</span>
+
+<span class="c"># Configure kubectl for the root user</span>
+<span class="cm">mkdir</span> <span class="fl">-p</span> $HOME/.kube
+<span class="cm">cp</span> <span class="fl">-i</span> /etc/kubernetes/admin.conf $HOME/.kube/config
+<span class="cm">chown</span> $(id <span class="fl">-u</span>):$(id <span class="fl">-g</span>) $HOME/.kube/config
+
+<span class="c"># Install CNI plugin (Flannel)</span>
+<span class="cm">kubectl</span> apply <span class="fl">-f</span> https://github.com/flannel-io/flannel/releases/latest/download/kube-flannel.yml
+
+<span class="c"># Verify control plane is healthy</span>
+<span class="cm">kubectl</span> get nodes
+<span class="out">NAME         STATUS   ROLES           AGE   VERSION
+cp-node-1    Ready    control-plane   2m    v1.29.3</span>
+
+<span class="cm">kubectl</span> get pods <span class="fl">-n</span> kube-system
+<span class="out">kube-apiserver-cp-node-1         1/1   Running
+kube-controller-manager-cp-node-1  1/1 Running
+kube-scheduler-cp-node-1         1/1   Running
+etcd-cp-node-1                   1/1   Running
+coredns-xxx                      1/1   Running</span></pre>
+    </div>
+
+    <h3>// Join Additional Nodes</h3>
+
+    <div class="code-block">
+      <div class="code-header"><div class="code-dots"><span></span><span></span><span></span></div><div class="code-lang">bash · join worker and control plane nodes</div></div>
+      <pre><span class="c"># On worker nodes</span>
+<span class="cm">kubeadm</span> join lb.example.com:6443 \
+  <span class="fl">--token</span> abc.xyz \
+  <span class="fl">--discovery-token-ca-cert-hash</span> sha256:...
+
+<span class="c"># On additional control plane nodes</span>
+<span class="cm">kubeadm</span> join lb.example.com:6443 \
+  <span class="fl">--token</span> abc.xyz \
+  <span class="fl">--discovery-token-ca-cert-hash</span> sha256:... \
+  <span class="fl">--control-plane</span> \
+  <span class="fl">--certificate-key</span> &lt;key&gt;
+
+<span class="c"># Generate a new join token if the old one expired (24h TTL)</span>
+<span class="cm">kubeadm</span> token create <span class="fl">--print-join-command</span>
+
+<span class="c"># Upgrade the cluster</span>
+<span class="cm">apt-get</span> install <span class="fl">-y</span> kubeadm=1.30.0-1.1
+<span class="cm">kubeadm</span> upgrade plan
+<span class="cm">kubeadm</span> upgrade apply v1.30.0
+<span class="c"># Then upgrade kubelet + kubectl on each node, one at a time</span>
+<span class="cm">kubectl</span> drain &lt;node&gt; <span class="fl">--ignore-daemonsets</span>
+<span class="cm">apt-get</span> install <span class="fl">-y</span> kubelet=1.30.0-1.1 kubectl=1.30.0-1.1
+<span class="cm">systemctl</span> restart kubelet
+<span class="cm">kubectl</span> uncordon &lt;node&gt;</pre>
+    </div>
+
+    <div class="callout purple">
+      <div class="callout-label">📜 Static Pods</div>
+      <p>Control plane components (API server, scheduler, etcd, controller manager) run as <strong>static Pods</strong> — managed directly by kubelet, not by the API server. Their manifests live in <code>/etc/kubernetes/manifests/</code>. You can edit them directly to change control plane configuration.</p>
+    </div>
+  </section>
+
+  <!-- ══════════════════════ SECTION 2: CRDs & OPERATORS -->
+  <section id="crd">
+    <div class="section-num">// 02</div>
+    <h2>CRDs & Operators</h2>
+    <p>Kubernetes is extensible. <strong>Custom Resource Definitions (CRDs)</strong> let you teach Kubernetes about your own resource types. An <strong>Operator</strong> is a controller that uses CRDs to automate the lifecycle of complex stateful applications — encoding operational knowledge into software.</p>
+
+    <div class="diagram">
+      <div class="diagram-label">CRD + Operator Pattern</div>
+      <div class="d-row">
+        <div class="d-box amber">User creates<br><code>Database</code> CR</div>
+        <div class="d-arrow">→ stored in etcd →</div>
+        <div class="d-box purple">Operator watches<br>for Database events</div>
+        <div class="d-arrow">→ reconcile loop →</div>
+        <div class="d-col">
+          <div class="d-box green">Creates StatefulSet</div>
+          <div class="d-box green">Creates Service</div>
+          <div class="d-box green">Creates Secret</div>
+          <div class="d-box green">Creates Backup CronJob</div>
+        </div>
+      </div>
+    </div>
+
+    <h3>// Defining a CRD</h3>
+
+    <div class="code-block">
+      <div class="code-header"><div class="code-dots"><span></span><span></span><span></span></div><div class="code-lang">yaml · custom resource definition</div></div>
+      <pre><span class="k">apiVersion</span>: <span class="v">apiextensions.k8s.io/v1</span>
+<span class="k">kind</span>: <span class="v">CustomResourceDefinition</span>
+<span class="k">metadata</span>:
+  <span class="k">name</span>: <span class="v">databases.mycompany.io</span>    <span class="c"># plural.group</span>
+<span class="k">spec</span>:
+  <span class="k">group</span>: <span class="v">mycompany.io</span>
+  <span class="k">names</span>:
+    <span class="k">kind</span>: <span class="v">Database</span>
+    <span class="k">plural</span>: <span class="v">databases</span>
+    <span class="k">singular</span>: <span class="v">database</span>
+    <span class="k">shortNames</span>: [<span class="v">db</span>]
+  <span class="k">scope</span>: <span class="v">Namespaced</span>
+  <span class="k">versions</span>:
+  - <span class="k">name</span>: <span class="v">v1alpha1</span>
+    <span class="k">served</span>: <span class="hl">true</span>
+    <span class="k">storage</span>: <span class="hl">true</span>
+    <span class="k">schema</span>:
+      <span class="k">openAPIV3Schema</span>:
+        <span class="k">type</span>: <span class="v">object</span>
+        <span class="k">properties</span>:
+          <span class="k">spec</span>:
+            <span class="k">type</span>: <span class="v">object</span>
+            <span class="k">required</span>: [<span class="v">engine</span>, <span class="v">version</span>, <span class="v">replicas</span>]
+            <span class="k">properties</span>:
+              <span class="k">engine</span>:
+                <span class="k">type</span>: <span class="v">string</span>
+                <span class="k">enum</span>: [<span class="v">postgres</span>, <span class="v">mysql</span>, <span class="v">mariadb</span>]
+              <span class="k">version</span>:
+                <span class="k">type</span>: <span class="v">string</span>
+              <span class="k">replicas</span>:
+                <span class="k">type</span>: <span class="v">integer</span>
+                <span class="k">minimum</span>: <span class="n">1</span>
+                <span class="k">maximum</span>: <span class="n">5</span>
+              <span class="k">storage</span>:
+                <span class="k">type</span>: <span class="v">string</span>
+                <span class="k">default</span>: <span class="v">"10Gi"</span>
+    <span class="k">additionalPrinterColumns</span>:
+    - <span class="k">name</span>: <span class="v">Engine</span>
+      <span class="k">type</span>: <span class="v">string</span>
+      <span class="k">jsonPath</span>: <span class="v">.spec.engine</span>
+    - <span class="k">name</span>: <span class="v">Ready</span>
+      <span class="k">type</span>: <span class="v">string</span>
+      <span class="k">jsonPath</span>: <span class="v">.status.ready</span></pre>
+    </div>
+
+    <div class="code-block">
+      <div class="code-header"><div class="code-dots"><span></span><span></span><span></span></div><div class="code-lang">yaml · custom resource instance (CR)</div></div>
+      <pre><span class="k">apiVersion</span>: <span class="v">mycompany.io/v1alpha1</span>
+<span class="k">kind</span>: <span class="v">Database</span>
+<span class="k">metadata</span>:
+  <span class="k">name</span>: <span class="v">my-postgres</span>
+  <span class="k">namespace</span>: <span class="v">production</span>
+<span class="k">spec</span>:
+  <span class="k">engine</span>: <span class="v">postgres</span>
+  <span class="k">version</span>: <span class="v">"15.3"</span>
+  <span class="k">replicas</span>: <span class="n">3</span>
+  <span class="k">storage</span>: <span class="v">"50Gi"</span>
+
+<span class="c"># kubectl treats it like any native resource</span>
+<span class="out">$ kubectl get databases
+NAME          ENGINE     READY   AGE
+my-postgres   postgres   true    5m</span></pre>
+    </div>
+
+    <h3>// Writing an Operator in Go (with controller-runtime)</h3>
+    <p>The <strong>Operator SDK</strong> and <strong>controller-runtime</strong> are the standard frameworks. An Operator is a Go program running in the cluster that watches for your CRs and reconciles the actual state to match the desired state.</p>
+
+    <div class="code-block">
+      <div class="code-header"><div class="code-dots"><span></span><span></span><span></span></div><div class="code-lang">go · database_controller.go — reconcile loop skeleton</div></div>
+      <pre><span class="go">package</span> controllers
+
+<span class="go">import</span> (
+    <span class="v">"context"</span>
+    appsv1 <span class="v">"k8s.io/api/apps/v1"</span>
+    myv1  <span class="v">"github.com/myorg/db-operator/api/v1alpha1"</span>
+    ctrl  <span class="v">"sigs.k8s.io/controller-runtime"</span>
+)
+
+<span class="go">type</span> DatabaseReconciler <span class="go">struct</span> {
+    client.Client
+    Scheme *runtime.Scheme
+}
+
+<span class="c">// Reconcile is called whenever a Database CR is created/updated/deleted</span>
+<span class="go">func</span> (r *DatabaseReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
+    <span class="c">// 1. Fetch the Database CR</span>
+    db := &myv1.Database{}
+    <span class="go">if</span> err := r.Get(ctx, req.NamespacedName, db); err != nil {
+        <span class="go">return</span> ctrl.Result{}, client.IgnoreNotFound(err)
+    }
+
+    <span class="c">// 2. Define desired StatefulSet</span>
+    sts := r.buildStatefulSet(db)
+
+    <span class="c">// 3. Create or Update (server-side apply pattern)</span>
+    <span class="go">if</span> err := ctrl.SetControllerReference(db, sts, r.Scheme); err != nil {
+        <span class="go">return</span> ctrl.Result{}, err
+    }
+    <span class="go">if</span> err := r.createOrUpdate(ctx, sts); err != nil {
+        <span class="go">return</span> ctrl.Result{}, err
+    }
+
+    <span class="c">// 4. Update status subresource</span>
+    db.Status.Ready = <span class="v">"true"</span>
+    db.Status.Replicas = *sts.Spec.Replicas
+    r.Status().Update(ctx, db)
+
+    <span class="c">// 5. Requeue after 30s to drift-check</span>
+    <span class="go">return</span> ctrl.Result{RequeueAfter: 30 * time.Second}, nil
+}</pre>
+    </div>
+
+    <div class="code-block">
+      <div class="code-header"><div class="code-dots"><span></span><span></span><span></span></div><div class="code-lang">bash · operator sdk workflow</div></div>
+      <pre><span class="c"># Install operator-sdk</span>
+<span class="cm">brew</span> install operator-sdk
+
+<span class="c"># Scaffold a new operator project</span>
+<span class="cm">operator-sdk</span> init <span class="fl">--domain</span> mycompany.io <span class="fl">--repo</span> github.com/myorg/db-operator
+<span class="cm">operator-sdk</span> create api <span class="fl">--group</span> mycompany <span class="fl">--version</span> v1alpha1 <span class="fl">--kind</span> Database \
+  <span class="fl">--resource</span> <span class="fl">--controller</span>
+
+<span class="c"># Generate CRD YAML from Go types</span>
+<span class="cm">make</span> generate manifests
+
+<span class="c"># Run locally against your current cluster (no deploy needed)</span>
+<span class="cm">make</span> install    <span class="c"># apply CRDs to cluster</span>
+<span class="cm">make</span> run        <span class="c"># run controller locally</span>
+
+<span class="c"># Build and deploy operator to cluster</span>
+<span class="cm">make</span> docker-build docker-push IMG=ghcr.io/myorg/db-operator:v0.1
+<span class="cm">make</span> deploy IMG=ghcr.io/myorg/db-operator:v0.1</pre>
+    </div>
+
+    <div class="callout tip">
+      <div class="callout-label">💡 Operator Maturity Model</div>
+      <p>The Operator Framework defines 5 capability levels: Level 1 (Basic Install) → Level 2 (Seamless Upgrades) → Level 3 (Full Lifecycle) → Level 4 (Deep Insights) → Level 5 (Auto Pilot). Start at Level 1 and add capabilities as your operator matures.</p>
+    </div>
+  </section>
+
+  <!-- ══════════════════════ SECTION 3: SERVICE MESH -->
+  <section id="servicemesh">
+    <div class="section-num">// 03</div>
+    <h2>Service Mesh with Istio</h2>
+    <p>At scale, microservices need more than Kubernetes provides: mutual TLS between every service, fine-grained traffic control, circuit breaking, distributed tracing, and deep observability — <em>without</em> changing application code. That's what a service mesh delivers.</p>
+
+    <div class="compare">
+      <div class="compare-col purple-t">
+        <div class="compare-col-title">Without Service Mesh</div>
+        <div class="compare-item">mTLS requires app-level implementation</div>
+        <div class="compare-item">Traffic splitting needs multiple Deployments</div>
+        <div class="compare-item">Retry/timeout logic in every service</div>
+        <div class="compare-item">No automatic distributed tracing</div>
+        <div class="compare-item">Observability gaps between services</div>
+      </div>
+      <div class="compare-col pink-t">
+        <div class="compare-col-title">With Istio (Sidecar Proxy)</div>
+        <div class="compare-item">Automatic mTLS for all Pod-to-Pod traffic</div>
+        <div class="compare-item">Traffic splitting via VirtualService weights</div>
+        <div class="compare-item">Retry/timeout declared in YAML, not code</div>
+        <div class="compare-item">Automatic Jaeger/Zipkin distributed traces</div>
+        <div class="compare-item">L7 metrics: latency, error rate, throughput per route</div>
+      </div>
+    </div>
+
+    <h3>// Istio Architecture</h3>
+
+    <div class="diagram">
+      <div class="diagram-label">Istio Data Plane (Envoy Sidecar Injection)</div>
+      <div class="d-row">
+        <div class="d-box gray">Service A Pod<br><small>app container<br>+ <strong style="color:var(--accent2)">envoy sidecar</strong></small></div>
+        <div class="d-arrow">← mTLS encrypted →</div>
+        <div class="d-box gray">Service B Pod<br><small>app container<br>+ <strong style="color:var(--accent2)">envoy sidecar</strong></small></div>
+      </div>
+      <div style="margin:1rem 0 0.5rem;color:var(--muted);font-size:0.7rem">Envoy sidecars intercept all traffic. Control plane (istiod) programs them with routing rules.</div>
+      <div class="d-row">
+        <div class="d-box purple">istiod<br><small>Pilot + Citadel + Galley<br>Control Plane</small></div>
+        <div class="d-arrow">→ xDS config push →</div>
+        <div class="d-col">
+          <div class="d-box pink">Envoy (sidecar A)<br><small>routing + mTLS</small></div>
+          <div class="d-box pink">Envoy (sidecar B)<br><small>routing + mTLS</small></div>
+          <div class="d-box pink">Ingress Gateway<br><small>edge traffic</small></div>
+        </div>
+      </div>
+    </div>
+
+    <h3>// Installing Istio</h3>
+
+    <div class="code-block">
+      <div class="code-header"><div class="code-dots"><span></span><span></span><span></span></div><div class="code-lang">bash · install istio with istioctl</div></div>
+      <pre><span class="c"># Install istioctl</span>
+<span class="cm">curl</span> <span class="fl">-L</span> https://istio.io/downloadIstio | sh -
+<span class="cm">export</span> PATH=$PATH:./istio-1.21.0/bin
+
+<span class="c"># Install Istio into the cluster (demo profile for learning)</span>
+<span class="cm">istioctl</span> install <span class="fl">--set</span> profile=demo <span class="fl">-y</span>
+
+<span class="c"># Enable sidecar injection for a namespace</span>
+<span class="cm">kubectl</span> label namespace production istio-injection=enabled
+
+<span class="c"># Verify sidecar is injected (Pods have 2 containers)</span>
+<span class="cm">kubectl</span> rollout restart deployment <span class="fl">-n</span> production
+<span class="cm">kubectl</span> get pods <span class="fl">-n</span> production
+<span class="out">NAME                  READY   STATUS
+my-app-xxx            2/2     Running   ← 2 = app + envoy sidecar</span>
+
+<span class="c"># Install Kiali dashboard (mesh observability UI)</span>
+<span class="cm">kubectl</span> apply <span class="fl">-f</span> istio-1.21.0/samples/addons/kiali.yaml
+<span class="cm">kubectl</span> apply <span class="fl">-f</span> istio-1.21.0/samples/addons/jaeger.yaml
+<span class="cm">istioctl</span> dashboard kiali</pre>
+    </div>
+
+    <h3>// Traffic Management</h3>
+
+    <div class="code-block">
+      <div class="code-header"><div class="code-dots"><span></span><span></span><span></span></div><div class="code-lang">yaml · canary deploy — 90/10 traffic split</div></div>
+      <pre><span class="c"># VirtualService controls routing</span>
+<span class="k">apiVersion</span>: <span class="v">networking.istio.io/v1beta1</span>
+<span class="k">kind</span>: <span class="v">VirtualService</span>
+<span class="k">metadata</span>: { <span class="k">name</span>: <span class="v">my-app</span> }
+<span class="k">spec</span>:
+  <span class="k">hosts</span>: [<span class="v">my-app</span>]
+  <span class="k">http</span>:
+  - <span class="k">route</span>:
+    - <span class="k">destination</span>: { <span class="k">host</span>: <span class="v">my-app</span>, <span class="k">subset</span>: <span class="v">stable</span> }
+      <span class="k">weight</span>: <span class="n">90</span>
+    - <span class="k">destination</span>: { <span class="k">host</span>: <span class="v">my-app</span>, <span class="k">subset</span>: <span class="v">canary</span> }
+      <span class="k">weight</span>: <span class="n">10</span>
+    <span class="k">retries</span>:
+      <span class="k">attempts</span>: <span class="n">3</span>
+      <span class="k">perTryTimeout</span>: <span class="v">5s</span>
+    <span class="k">timeout</span>: <span class="v">10s</span>
+
+<span class="c">---</span>
+<span class="c"># DestinationRule defines subsets (stable vs canary)</span>
+<span class="k">apiVersion</span>: <span class="v">networking.istio.io/v1beta1</span>
+<span class="k">kind</span>: <span class="v">DestinationRule</span>
+<span class="k">metadata</span>: { <span class="k">name</span>: <span class="v">my-app</span> }
+<span class="k">spec</span>:
+  <span class="k">host</span>: <span class="v">my-app</span>
+  <span class="k">trafficPolicy</span>:
+    <span class="k">tls</span>: { <span class="k">mode</span>: <span class="v">ISTIO_MUTUAL</span> }     <span class="c"># enforce mTLS</span>
+    <span class="k">connectionPool</span>:
+      <span class="k">tcp</span>: { <span class="k">maxConnections</span>: <span class="n">100</span> }
+    <span class="k">outlierDetection</span>:                  <span class="c"># circuit breaker</span>
+      <span class="k">consecutive5xxErrors</span>: <span class="n">5</span>
+      <span class="k">interval</span>: <span class="v">30s</span>
+      <span class="k">baseEjectionTime</span>: <span class="v">60s</span>
+  <span class="k">subsets</span>:
+  - <span class="k">name</span>: <span class="v">stable</span>
+    <span class="k">labels</span>: { <span class="k">version</span>: <span class="v">v1</span> }
+  - <span class="k">name</span>: <span class="v">canary</span>
+    <span class="k">labels</span>: { <span class="k">version</span>: <span class="v">v2</span> }</pre>
+    </div>
+
+    <h3>// PeerAuthentication — Enforce mTLS</h3>
+
+    <div class="code-block">
+      <div class="code-header"><div class="code-dots"><span></span><span></span><span></span></div><div class="code-lang">yaml · enforce strict mTLS cluster-wide</div></div>
+      <pre><span class="k">apiVersion</span>: <span class="v">security.istio.io/v1beta1</span>
+<span class="k">kind</span>: <span class="v">PeerAuthentication</span>
+<span class="k">metadata</span>:
+  <span class="k">name</span>: <span class="v">default</span>
+  <span class="k">namespace</span>: <span class="v">istio-system</span>   <span class="c"># applies cluster-wide</span>
+<span class="k">spec</span>:
+  <span class="k">mtls</span>:
+    <span class="k">mode</span>: <span class="v">STRICT</span>   <span class="c"># reject any plaintext traffic between Pods</span>
+
+<span class="c">---</span>
+<span class="c"># AuthorizationPolicy — who can call what</span>
+<span class="k">apiVersion</span>: <span class="v">security.istio.io/v1beta1</span>
+<span class="k">kind</span>: <span class="v">AuthorizationPolicy</span>
+<span class="k">metadata</span>: { <span class="k">name</span>: <span class="v">allow-frontend</span>, <span class="k">namespace</span>: <span class="v">production</span> }
+<span class="k">spec</span>:
+  <span class="k">selector</span>:
+    <span class="k">matchLabels</span>: { <span class="k">app</span>: <span class="v">backend</span> }
+  <span class="k">action</span>: <span class="v">ALLOW</span>
+  <span class="k">rules</span>:
+  - <span class="k">from</span>:
+    - <span class="k">source</span>:
+        <span class="k">principals</span>: [<span class="v">"cluster.local/ns/production/sa/frontend"</span>]
+    <span class="k">to</span>:
+    - <span class="k">operation</span>:
+        <span class="k">methods</span>: [<span class="v">GET</span>, <span class="v">POST</span>]
+        <span class="k">paths</span>: [<span class="v">/api/*</span>]</pre>
+    </div>
+  </section>
+
+  <!-- ══════════════════════ SECTION 4: SECURITY -->
+  <section id="security">
+    <div class="section-num">// 04</div>
+    <h2>Advanced Security Hardening</h2>
+    <p>Production clusters handle sensitive data and run business-critical workloads. Security must be layered: admission control, runtime detection, supply chain integrity, and secret management.</p>
+
+    <h3>// OPA Gatekeeper — Policy as Code</h3>
+    <p>Open Policy Agent (OPA) Gatekeeper enforces custom policies at admission time — before any resource reaches etcd. Write policies in <strong>Rego</strong> language, define them as <code>ConstraintTemplates</code>.</p>
+
+    <div class="code-block">
+      <div class="code-header"><div class="code-dots"><span></span><span></span><span></span></div><div class="code-lang">bash + yaml · install gatekeeper and create a policy</div></div>
+      <pre><span class="c"># Install Gatekeeper</span>
+<span class="cm">helm</span> repo add gatekeeper https://open-policy-agent.github.io/gatekeeper/charts
+<span class="cm">helm</span> install gatekeeper gatekeeper/gatekeeper <span class="fl">--namespace</span> gatekeeper-system \
+  <span class="fl">--create-namespace</span>
+
+<span class="c">---</span>
+<span class="c"># ConstraintTemplate: defines the policy logic in Rego</span>
+<span class="k">apiVersion</span>: <span class="v">templates.gatekeeper.sh/v1</span>
+<span class="k">kind</span>: <span class="v">ConstraintTemplate</span>
+<span class="k">metadata</span>: { <span class="k">name</span>: <span class="v">requiredlabels</span> }
+<span class="k">spec</span>:
+  <span class="k">crd</span>:
+    <span class="k">spec</span>:
+      <span class="k">names</span>: { <span class="k">kind</span>: <span class="v">RequiredLabels</span> }
+      <span class="k">validation</span>:
+        <span class="k">openAPIV3Schema</span>:
+          <span class="k">type</span>: <span class="v">object</span>
+          <span class="k">properties</span>:
+            <span class="k">labels</span>: { <span class="k">type</span>: <span class="v">array</span>, <span class="k">items</span>: { <span class="k">type</span>: <span class="v">string</span> } }
+  <span class="k">targets</span>:
+  - <span class="k">target</span>: <span class="v">admission.k8s.gatekeeper.sh</span>
+    <span class="k">rego</span>: |
+      <span class="wt">package requiredlabels</span>
+      <span class="wt">violation[{"msg": msg}] {</span>
+        <span class="wt">  required := input.parameters.labels[_]</span>
+        <span class="wt">  not input.review.object.metadata.labels[required]</span>
+        <span class="wt">  msg := sprintf("Missing required label: %v", [required])</span>
+      <span class="wt">}</span>
+
+<span class="c">---</span>
+<span class="c"># Constraint: enforce the policy on Deployments</span>
+<span class="k">apiVersion</span>: <span class="v">constraints.gatekeeper.sh/v1beta1</span>
+<span class="k">kind</span>: <span class="v">RequiredLabels</span>
+<span class="k">metadata</span>: { <span class="k">name</span>: <span class="v">deployment-must-have-owner</span> }
+<span class="k">spec</span>:
+  <span class="k">match</span>:
+    <span class="k">kinds</span>: [{ <span class="k">apiGroups</span>: [<span class="v">apps</span>], <span class="k">kinds</span>: [<span class="v">Deployment</span>] }]
+  <span class="k">parameters</span>:
+    <span class="k">labels</span>: [<span class="v">owner</span>, <span class="v">team</span>, <span class="v">cost-center</span>]</pre>
+    </div>
+
+    <h3>// Pod Security Standards</h3>
+    <p>Kubernetes built-in <strong>Pod Security Admission</strong> (replaced PodSecurityPolicy in 1.25) enforces security profiles at the namespace level via labels.</p>
+
+    <div class="code-block">
+      <div class="code-header"><div class="code-dots"><span></span><span></span><span></span></div><div class="code-lang">bash · pod security admission labels</div></div>
+      <pre><span class="c"># Three levels: privileged | baseline | restricted</span>
+<span class="c"># Three modes:  enforce | audit | warn</span>
+
+<span class="c"># Label a namespace to enforce restricted policy</span>
+<span class="cm">kubectl</span> label namespace production \
+  pod-security.kubernetes.io/enforce=restricted \
+  pod-security.kubernetes.io/enforce-version=latest \
+  pod-security.kubernetes.io/audit=restricted \
+  pod-security.kubernetes.io/warn=restricted
+
+<span class="c"># A "restricted" pod must meet these requirements:</span>
+<span class="out">- Run as non-root user
+- Drop ALL capabilities
+- No privilege escalation
+- Read-only root filesystem (recommended)
+- Use seccompProfile: RuntimeDefault or Localhost</span></pre>
+    </div>
+
+    <div class="code-block">
+      <div class="code-header"><div class="code-dots"><span></span><span></span><span></span></div><div class="code-lang">yaml · restricted-compliant pod spec</div></div>
+      <pre><span class="k">spec</span>:
+  <span class="k">securityContext</span>:
+    <span class="k">runAsNonRoot</span>: <span class="hl">true</span>
+    <span class="k">runAsUser</span>: <span class="n">10001</span>
+    <span class="k">fsGroup</span>: <span class="n">10001</span>
+    <span class="k">seccompProfile</span>:
+      <span class="k">type</span>: <span class="v">RuntimeDefault</span>
+  <span class="k">containers</span>:
+  - <span class="k">name</span>: <span class="v">app</span>
+    <span class="k">image</span>: <span class="v">myapp:v1</span>
+    <span class="k">securityContext</span>:
+      <span class="k">allowPrivilegeEscalation</span>: <span class="hl">false</span>
+      <span class="k">readOnlyRootFilesystem</span>: <span class="hl">true</span>
+      <span class="k">capabilities</span>:
+        <span class="k">drop</span>: [<span class="v">ALL</span>]
+    <span class="k">volumeMounts</span>:
+    - <span class="k">name</span>: <span class="v">tmp</span>
+      <span class="k">mountPath</span>: <span class="v">/tmp</span>             <span class="c"># writeable tmpfs for /tmp</span>
+  <span class="k">volumes</span>:
+  - <span class="k">name</span>: <span class="v">tmp</span>
+    <span class="k">emptyDir</span>: { <span class="k">medium</span>: <span class="v">Memory</span> }</pre>
+    </div>
+
+    <h3>// Falco — Runtime Threat Detection</h3>
+    <p>Falco monitors kernel system calls in real-time and alerts on suspicious behavior — like a shell being spawned inside a container, a sensitive file being read, or privilege escalation.</p>
+
+    <div class="code-block">
+      <div class="code-header"><div class="code-dots"><span></span><span></span><span></span></div><div class="code-lang">bash + yaml · install falco and write a custom rule</div></div>
+      <pre><span class="cm">helm</span> repo add falcosecurity https://falcosecurity.github.io/charts
+<span class="cm">helm</span> install falco falcosecurity/falco \
+  <span class="fl">--namespace</span> falco <span class="fl">--create-namespace</span> \
+  <span class="fl">--set</span> driver.kind=ebpf \           <span class="c"># use eBPF for modern kernels</span>
+  <span class="fl">--set</span> falcosidekick.enabled=true \ <span class="c"># forward alerts to Slack/PagerDuty</span>
+  <span class="fl">--set</span> falcosidekick.config.slack.webhookurl=https://hooks.slack.com/...
+
+<span class="c"># Custom Falco rule — alert if anyone exec's into a prod pod</span>
+<span class="k">- rule</span>: <span class="v">Exec into Production Container</span>
+  <span class="k">desc</span>: <span class="v">Alert when kubectl exec is used on a production pod</span>
+  <span class="k">condition</span>: <span class="v">spawned_process and container and k8s.ns.name = "production"</span>
+  <span class="k">output</span>: |
+    <span class="v">Shell opened in production (user=%user.name pod=%k8s.pod.name
+    cmd=%proc.cmdline ns=%k8s.ns.name)</span>
+  <span class="k">priority</span>: <span class="v">WARNING</span>
+  <span class="k">tags</span>: [<span class="v">production</span>, <span class="v">shell</span>, <span class="v">compliance</span>]</pre>
+    </div>
+
+    <h3>// Secrets Management</h3>
+
+    <table class="data-table">
+      <thead><tr><th>Approach</th><th>How It Works</th><th>Best For</th></tr></thead>
+      <tbody>
+        <tr><td><strong>K8s Secrets (base64)</strong></td><td>Stored in etcd, base64 encoded. Use RBAC to restrict access.</td><td>Simple cases, encrypted etcd at rest</td></tr>
+        <tr><td><strong>Sealed Secrets</strong></td><td>Encrypted with cluster public key. Safe to store in Git.</td><td>GitOps workflows</td></tr>
+        <tr><td><strong>External Secrets Operator</strong></td><td>Syncs secrets from AWS SSM/Secrets Manager, Vault, GCP Secret Manager into K8s Secrets.</td><td>Enterprise, secrets rotation</td></tr>
+        <tr><td><strong>HashiCorp Vault + Agent</strong></td><td>Vault sidecar injects secrets as files/env vars. Supports dynamic secrets and leases.</td><td>Zero-trust, complex secret lifecycle</td></tr>
+      </tbody>
+    </table>
+
+    <div class="code-block">
+      <div class="code-header"><div class="code-dots"><span></span><span></span><span></span></div><div class="code-lang">yaml · external secrets operator — sync from AWS Secrets Manager</div></div>
+      <pre><span class="k">apiVersion</span>: <span class="v">external-secrets.io/v1beta1</span>
+<span class="k">kind</span>: <span class="v">ExternalSecret</span>
+<span class="k">metadata</span>: { <span class="k">name</span>: <span class="v">db-credentials</span> }
+<span class="k">spec</span>:
+  <span class="k">refreshInterval</span>: <span class="v">1h</span>              <span class="c"># re-sync from source every hour</span>
+  <span class="k">secretStoreRef</span>: { <span class="k">name</span>: <span class="v">aws-ssm</span>, <span class="k">kind</span>: <span class="v">ClusterSecretStore</span> }
+  <span class="k">target</span>:
+    <span class="k">name</span>: <span class="v">db-secret</span>               <span class="c"># creates this K8s Secret</span>
+    <span class="k">creationPolicy</span>: <span class="v">Owner</span>
+  <span class="k">data</span>:
+  - <span class="k">secretKey</span>: <span class="v">password</span>
+    <span class="k">remoteRef</span>:
+      <span class="k">key</span>: <span class="v">/production/database/password</span>  <span class="c"># AWS SSM path</span></pre>
+    </div>
+  </section>
+
+  <!-- ══════════════════════ SECTION 5: ETCD -->
+  <section id="etcd">
+    <div class="section-num">// 05</div>
+    <h2>etcd Operations</h2>
+    <p>etcd is Kubernetes's brain — every cluster resource, every Secret, every ConfigMap lives here. Losing etcd without a backup means losing your entire cluster state. Mastering etcd operations is critical for CKA and production reliability.</p>
+
+    <div class="diagram">
+      <div class="diagram-label">etcd Raft Consensus in a 3-Node Cluster</div>
+      <div class="d-row">
+        <div class="d-box purple">etcd Leader<br><small>receives all writes<br>replicates to followers</small></div>
+        <div class="d-arrow">← replicate →</div>
+        <div class="d-col">
+          <div class="d-box indigo">etcd Follower 1<br><small>votes, serves reads</small></div>
+          <div class="d-box indigo">etcd Follower 2<br><small>votes, serves reads</small></div>
+        </div>
+      </div>
+      <div style="margin-top:0.75rem;font-size:0.7rem;color:var(--muted)">
+        Quorum = (n/2)+1 nodes must agree. 3-node cluster can lose 1 node. 5-node can lose 2. Always use odd numbers.
+      </div>
+    </div>
+
+    <h3>// Essential etcdctl Commands</h3>
+
+    <div class="code-block">
+      <div class="code-header"><div class="code-dots"><span></span><span></span><span></span></div><div class="code-lang">bash · etcdctl operations</div></div>
+      <pre><span class="c"># Always set these env vars when working with etcd</span>
+<span class="cm">export</span> ETCDCTL_API=3
+<span class="cm">export</span> ETCDCTL_CACERT=/etc/kubernetes/pki/etcd/ca.crt
+<span class="cm">export</span> ETCDCTL_CERT=/etc/kubernetes/pki/etcd/server.crt
+<span class="cm">export</span> ETCDCTL_KEY=/etc/kubernetes/pki/etcd/server.key
+<span class="cm">export</span> ETCDCTL_ENDPOINTS=https://127.0.0.1:2379
+
+<span class="c"># Check cluster health</span>
+<span class="cm">etcdctl</span> endpoint health
+<span class="out">https://127.0.0.1:2379 is healthy: committed 1234, took 1.5ms</span>
+
+<span class="cm">etcdctl</span> endpoint status <span class="fl">--write-out=table</span>
+<span class="out">ENDPOINT           ID     VERSION  DB SIZE  LEADER  RAFTTERM  RAFTINDEX
+127.0.0.1:2379  abc123  3.5.9    42 MB    abc123    8        100234</span>
+
+<span class="c"># Inspect data (K8s stores objects here)</span>
+<span class="cm">etcdctl</span> get / <span class="fl">--prefix</span> <span class="fl">--keys-only</span> | <span class="cm">head</span> -20
+<span class="out">/registry/deployments/production/my-app
+/registry/secrets/production/db-secret
+/registry/configmaps/kube-system/kubeadm-config</span>
+
+<span class="c"># Read a specific key (raw protobuf — pipe through auger for readable output)</span>
+<span class="cm">etcdctl</span> get /registry/deployments/production/my-app</pre>
+    </div>
+
+    <h3>// Backup & Restore</h3>
+
+    <div class="code-block">
+      <div class="code-header"><div class="code-dots"><span></span><span></span><span></span></div><div class="code-lang">bash · snapshot backup and restore</div></div>
+      <pre><span class="c">══════════════════════════════════════════
+  BACKUP — run on a control plane node
+══════════════════════════════════════════</span>
+<span class="cm">etcdctl</span> snapshot save /backup/etcd-snapshot-$(date +%Y%m%d-%H%M).db
+
+<span class="c"># Verify the snapshot</span>
+<span class="cm">etcdctl</span> snapshot status /backup/etcd-snapshot-20240225-0300.db <span class="fl">--write-out=table</span>
+<span class="out">HASH       REVISION  TOTAL KEYS  TOTAL SIZE
+8a3d9b2    100234    3412        45 MB</span>
+
+<span class="c"># Automate with a CronJob</span>
+<span class="cm">kubectl</span> apply <span class="fl">-f</span> etcd-backup-cronjob.yaml   <span class="c"># runs daily, uploads to S3</span>
+
+<span class="c">══════════════════════════════════════════
+  RESTORE — disaster recovery
+══════════════════════════════════════════</span>
+<span class="c"># 1. Stop API server (move static pod manifest out)</span>
+<span class="cm">mv</span> /etc/kubernetes/manifests/kube-apiserver.yaml /tmp/
+
+<span class="c"># 2. Restore snapshot to a new data directory</span>
+<span class="cm">etcdctl</span> snapshot restore /backup/etcd-snapshot-20240225-0300.db \
+  <span class="fl">--data-dir</span> /var/lib/etcd-restored \
+  <span class="fl">--name</span> cp-node-1 \
+  <span class="fl">--initial-cluster</span> cp-node-1=https://10.0.0.1:2380 \
+  <span class="fl">--initial-cluster-token</span> etcd-cluster-restored \
+  <span class="fl">--initial-advertise-peer-urls</span> https://10.0.0.1:2380
+
+<span class="c"># 3. Update etcd static pod to use new data dir</span>
+<span class="cm">sed</span> <span class="fl">-i</span> <span class="v">'s|/var/lib/etcd|/var/lib/etcd-restored|g'</span> \
+  /etc/kubernetes/manifests/etcd.yaml
+
+<span class="c"># 4. Restore API server</span>
+<span class="cm">mv</span> /tmp/kube-apiserver.yaml /etc/kubernetes/manifests/
+
+<span class="c"># 5. Verify cluster is back</span>
+<span class="cm">kubectl</span> get nodes
+<span class="cm">kubectl</span> get pods <span class="fl">-A</span></pre>
+    </div>
+
+    <div class="callout warn">
+      <div class="callout-label">⚠️ Backup Frequency</div>
+      <p>Run etcd snapshots at minimum <strong>every hour</strong> for production clusters. Use a CronJob that uploads snapshots to object storage (S3, GCS) with lifecycle rules to retain 7 days. Test your restore procedure quarterly — a backup you've never tested is not a backup.</p>
+    </div>
+
+    <h3>// Encrypting Secrets at Rest</h3>
+
+    <div class="code-block">
+      <div class="code-header"><div class="code-dots"><span></span><span></span><span></span></div><div class="code-lang">yaml · /etc/kubernetes/enc/config.yaml — encryption config</div></div>
+      <pre><span class="k">apiVersion</span>: <span class="v">apiserver.config.k8s.io/v1</span>
+<span class="k">kind</span>: <span class="v">EncryptionConfiguration</span>
+<span class="k">resources</span>:
+- <span class="k">resources</span>: [<span class="v">secrets</span>, <span class="v">configmaps</span>]
+  <span class="k">providers</span>:
+  - <span class="k">aescbc</span>:                       <span class="c"># AES-CBC encryption</span>
+      <span class="k">keys</span>:
+      - <span class="k">name</span>: <span class="v">key1</span>
+        <span class="k">secret</span>: <span class="v">&lt;base64-encoded-32-byte-key&gt;</span>
+  - <span class="k">identity</span>: {}                  <span class="c"># fallback for existing unencrypted data</span>
+
+<span class="c"># Add to kube-apiserver static pod:</span>
+<span class="c"># --encryption-provider-config=/etc/kubernetes/enc/config.yaml
+
+# Re-encrypt ALL existing secrets</span>
+<span class="cm">kubectl</span> get secrets <span class="fl">-A</span> <span class="fl">-o</span> json | <span class="cm">kubectl</span> replace <span class="fl">-f</span> -</pre>
+    </div>
+  </section>
+
+  <!-- ══════════════════════ SECTION 6: MULTI-CLUSTER -->
+  <section id="multicluster">
+    <div class="section-num">// 06</div>
+    <h2>Multi-Cluster Management</h2>
+    <p>As organizations scale, a single cluster is not enough. Multi-cluster setups provide geographic distribution, fault isolation, compliance boundaries, and team separation.</p>
+
+    <div class="card-grid">
+      <div class="card">
+        <div class="card-icon">🌐</div>
+        <div class="card-name">Cluster API (CAPI)</div>
+        <div class="card-desc">Declarative cluster lifecycle management using Kubernetes CRDs. Provision, upgrade, and delete clusters with kubectl — treating clusters like Pods.</div>
+        <div style="margin-top:0.75rem"><span class="tag purple">provisioning</span><span class="tag green">declarative</span></div>
+      </div>
+      <div class="card">
+        <div class="card-icon">🔗</div>
+        <div class="card-name">Fleet (Rancher)</div>
+        <div class="card-desc">GitOps at scale. Deploy applications to thousands of clusters from one Git repo. Supports cluster groupings and label-based targeting.</div>
+        <div style="margin-top:0.75rem"><span class="tag pink">gitops</span><span class="tag amber">at-scale</span></div>
+      </div>
+      <div class="card">
+        <div class="card-icon">🕸️</div>
+        <div class="card-name">Submariner</div>
+        <div class="card-desc">Network connectivity between clusters. Creates cross-cluster Service discovery and encrypted tunnels between Pod networks.</div>
+        <div style="margin-top:0.75rem"><span class="tag indigo">networking</span><span class="tag green">service discovery</span></div>
+      </div>
+      <div class="card">
+        <div class="card-icon">🗺️</div>
+        <div class="card-name">ArgoCD ApplicationSets</div>
+        <div class="card-desc">Deploy the same application to multiple clusters with one manifest. Supports cluster generators, list generators, and git directory generators.</div>
+        <div style="margin-top:0.75rem"><span class="tag purple">argocd</span><span class="tag pink">multi-cluster</span></div>
+      </div>
+    </div>
+
+    <h3>// ArgoCD ApplicationSet — Deploy to All Clusters</h3>
+
+    <div class="code-block">
+      <div class="code-header"><div class="code-dots"><span></span><span></span><span></span></div><div class="code-lang">yaml · applicationset.yaml — cluster generator</div></div>
+      <pre><span class="k">apiVersion</span>: <span class="v">argoproj.io/v1alpha1</span>
+<span class="k">kind</span>: <span class="v">ApplicationSet</span>
+<span class="k">metadata</span>: { <span class="k">name</span>: <span class="v">my-app-all-clusters</span>, <span class="k">namespace</span>: <span class="v">argocd</span> }
+<span class="k">spec</span>:
+  <span class="k">generators</span>:
+  - <span class="k">clusters</span>:                        <span class="c"># generate one App per registered cluster</span>
+      <span class="k">selector</span>:
+        <span class="k">matchLabels</span>:
+          <span class="k">env</span>: <span class="v">production</span>            <span class="c"># only prod clusters</span>
+  <span class="k">template</span>:
+    <span class="k">metadata</span>:
+      <span class="k">name</span>: <span class="v">'my-app-{{name}}'</span>        <span class="c"># name = cluster name</span>
+    <span class="k">spec</span>:
+      <span class="k">project</span>: <span class="v">default</span>
+      <span class="k">source</span>:
+        <span class="k">repoURL</span>: <span class="v">https://github.com/my-org/k8s-configs</span>
+        <span class="k">path</span>: <span class="v">'apps/my-app/{{metadata.labels.region}}'</span>   <span class="c"># region-specific values</span>
+        <span class="k">targetRevision</span>: <span class="v">HEAD</span>
+      <span class="k">destination</span>:
+        <span class="k">server</span>: <span class="v">'{{server}}'</span>         <span class="c"># cluster API server URL</span>
+        <span class="k">namespace</span>: <span class="v">production</span>
+      <span class="k">syncPolicy</span>:
+        <span class="k">automated</span>: { <span class="k">prune</span>: <span class="hl">true</span>, <span class="k">selfHeal</span>: <span class="hl">true</span> }</pre>
+    </div>
+
+    <h3>// Cross-Cluster Service Discovery with Submariner</h3>
+
+    <div class="code-block">
+      <div class="code-header"><div class="code-dots"><span></span><span></span><span></span></div><div class="code-lang">bash · submariner setup</div></div>
+      <pre><span class="c"># Install subctl CLI</span>
+<span class="cm">curl</span> <span class="fl">-Ls</span> https://get.submariner.io | bash
+
+<span class="c"># Deploy broker on the hub cluster</span>
+<span class="cm">subctl</span> deploy-broker <span class="fl">--kubeconfig</span> hub-cluster.kubeconfig
+
+<span class="c"># Join spoke clusters to the broker</span>
+<span class="cm">subctl</span> join broker-info.subm \
+  <span class="fl">--kubeconfig</span> cluster-eu.kubeconfig \
+  <span class="fl">--clusterid</span> cluster-eu
+
+<span class="cm">subctl</span> join broker-info.subm \
+  <span class="fl">--kubeconfig</span> cluster-ap.kubeconfig \
+  <span class="fl">--clusterid</span> cluster-ap
+
+<span class="c"># Export a Service from cluster-eu (make it discoverable cross-cluster)</span>
+<span class="cm">subctl</span> export service my-backend <span class="fl">-n</span> production \
+  <span class="fl">--kubeconfig</span> cluster-eu.kubeconfig
+
+<span class="c"># In cluster-ap, service is accessible as:</span>
+<span class="c"># my-backend.production.svc.clusterset.local</span>
+
+<span class="cm">kubectl</span> run test <span class="fl">--image=curlimages/curl --rm -it</span> \
+  -- curl http://my-backend.production.svc.clusterset.local/health</pre>
+    </div>
+  </section>
+
+  <!-- ══════════════════════ SECTION 7: DEBUGGING -->
+  <section id="debugging">
+    <div class="section-num">// 07</div>
+    <h2>Advanced Debugging Techniques</h2>
+    <p>At the advanced level, you need tools and techniques that go beyond <code>kubectl logs</code>. When things break in production, you need to move fast and dig deep.</p>
+
+    <h3>// Ephemeral Debug Containers</h3>
+    <p>Debug containers let you attach a fully-tooled shell into a running Pod without modifying its spec — even if the Pod's image has no shell at all.</p>
+
+    <div class="code-block">
+      <div class="code-header"><div class="code-dots"><span></span><span></span><span></span></div><div class="code-lang">bash · ephemeral debug containers</div></div>
+      <pre><span class="c"># Attach a debug container to a running pod</span>
+<span class="cm">kubectl</span> debug <span class="fl">-it</span> my-pod \
+  <span class="fl">--image=nicolaka/netshoot</span> \     <span class="c"># has tcpdump, curl, dig, ss, nmap etc.</span>
+  <span class="fl">--target=my-container</span>           <span class="c"># share PID namespace with this container</span>
+
+<span class="c"># Clone pod to a node with a debug container (doesn't affect original)</span>
+<span class="cm">kubectl</span> debug <span class="fl">-it</span> my-pod \
+  <span class="fl">--copy-to=debug-pod</span> \
+  <span class="fl">--image=busybox</span> \
+  <span class="fl">--share-processes</span>
+
+<span class="c"># Debug a node directly (runs privileged pod on the node)</span>
+<span class="cm">kubectl</span> debug node/worker-node-1 <span class="fl">-it --image=ubuntu</span>
+<span class="c"># Inside: chroot /host to access the node's full filesystem</span></pre>
+    </div>
+
+    <h3>// Deep Network Debugging</h3>
+
+    <div class="code-block">
+      <div class="code-header"><div class="code-dots"><span></span><span></span><span></span></div><div class="code-lang">bash · network packet capture in a pod</div></div>
+      <pre><span class="c"># Capture traffic on a pod's network interface</span>
+<span class="cm">kubectl</span> debug <span class="fl">-it</span> my-pod <span class="fl">--image=nicolaka/netshoot</span> <span class="fl">--target=app</span>
+<span class="c"># Inside the debug container:</span>
+<span class="cm">tcpdump</span> <span class="fl">-i eth0 -nn</span> <span class="v">'port 5432'</span>       <span class="c"># watch Postgres traffic</span>
+<span class="cm">tcpdump</span> <span class="fl">-i eth0 -w /tmp/cap.pcap</span>     <span class="c"># capture to file</span>
+
+<span class="c"># Inspect iptables rules (what K8s Services create)</span>
+<span class="cm">kubectl</span> debug node/worker-1 <span class="fl">-it --image=ubuntu</span>
+<span class="cm">chroot</span> /host
+<span class="cm">iptables</span> <span class="fl">-t nat -L</span> KUBE-SERVICES <span class="fl">-n</span>
+
+<span class="c"># Test DNS resolution from inside a pod's network namespace</span>
+<span class="cm">kubectl</span> run dnstest <span class="fl">--image=nicolaka/netshoot --rm -it</span> -- \
+  dig my-service.production.svc.cluster.local
+
+<span class="c"># Check kube-proxy mode and iptables/ipvs rules</span>
+<span class="cm">kubectl</span> <span class="fl">-n</span> kube-system describe configmap kube-proxy | <span class="cm">grep</span> mode</pre>
+    </div>
+
+    <h3>// API Server Audit Logs</h3>
+    <p>Audit logs record every request to the API server — who did what, when, and what the response was. Essential for security investigations and compliance.</p>
+
+    <div class="code-block">
+      <div class="code-header"><div class="code-dots"><span></span><span></span><span></span></div><div class="code-lang">yaml · audit-policy.yaml</div></div>
+      <pre><span class="k">apiVersion</span>: <span class="v">audit.k8s.io/v1</span>
+<span class="k">kind</span>: <span class="v">Policy</span>
+<span class="k">rules</span>:
+<span class="c"># Log all Secrets access at RequestResponse level</span>
+- <span class="k">level</span>: <span class="v">RequestResponse</span>
+  <span class="k">resources</span>:
+  - <span class="k">group</span>: <span class="v">""</span>
+    <span class="k">resources</span>: [<span class="v">secrets</span>]
+
+<span class="c"># Log Pod exec/attach at Metadata level</span>
+- <span class="k">level</span>: <span class="v">Metadata</span>
+  <span class="k">resources</span>:
+  - <span class="k">group</span>: <span class="v">""</span>
+    <span class="k">resources</span>: [<span class="v">pods/exec</span>, <span class="v">pods/attach</span>, <span class="v">pods/portforward</span>]
+
+<span class="c"># Skip noisy read-only operations</span>
+- <span class="k">level</span>: <span class="v">None</span>
+  <span class="k">verbs</span>: [<span class="v">get</span>, <span class="v">list</span>, <span class="v">watch</span>]
+  <span class="k">resources</span>:
+  - <span class="k">group</span>: <span class="v">""</span>
+    <span class="k">resources</span>: [<span class="v">endpoints</span>, <span class="v">services</span>, <span class="v">configmaps</span>]
+
+<span class="c"># Catch-all — log everything else at Metadata</span>
+- <span class="k">level</span>: <span class="v">Metadata</span>
+
+<span class="c"># Add to kube-apiserver:
+# --audit-policy-file=/etc/kubernetes/audit-policy.yaml
+# --audit-log-path=/var/log/kubernetes/audit.log
+# --audit-log-maxage=30 --audit-log-maxbackup=10</span></pre>
+    </div>
+
+    <h3>// kubectl Advanced Tricks</h3>
+
+    <div class="cheat-grid">
+      <div class="cheat-box purple-top">
+        <div class="cheat-box-title">JSON Path & Output</div>
+        <div class="cheat-row"><span class="cheat-cmd">-o jsonpath='{.items[*].metadata.name}'</span><span class="cheat-desc">Extract specific field from list</span></div>
+        <div class="cheat-row"><span class="cheat-cmd">-o custom-columns=NAME:.metadata.name,IP:.status.podIP</span><span class="cheat-desc">Custom table columns</span></div>
+        <div class="cheat-row"><span class="cheat-cmd">kubectl get events --sort-by='.lastTimestamp'</span><span class="cheat-desc">Sort events by time</span></div>
+        <div class="cheat-row"><span class="cheat-cmd">kubectl get pods -A --field-selector=status.phase!=Running</span><span class="cheat-desc">Find non-running pods</span></div>
+      </div>
+      <div class="cheat-box pink-top">
+        <div class="cheat-box-title">Patching Resources</div>
+        <div class="cheat-row"><span class="cheat-cmd">kubectl patch deploy app --type=merge -p '{"spec":{"replicas":5}}'</span><span class="cheat-desc">Merge patch — partial update</span></div>
+        <div class="cheat-row"><span class="cheat-cmd">kubectl patch node worker --type=json -p '[{"op":"add","path":"/spec/unschedulable","value":true}]'</span><span class="cheat-desc">JSON patch — surgical changes</span></div>
+        <div class="cheat-row"><span class="cheat-cmd">kubectl set image deploy/app app=image:v2</span><span class="cheat-desc">Update container image</span></div>
+      </div>
+      <div class="cheat-box indigo-top">
+        <div class="cheat-box-title">Resource Analysis</div>
+        <div class="cheat-row"><span class="cheat-cmd">kubectl top pods -A --sort-by=memory</span><span class="cheat-desc">Find memory-hungry pods</span></div>
+        <div class="cheat-row"><span class="cheat-cmd">kubectl describe node | grep -A5 "Allocated"</span><span class="cheat-desc">Node resource allocation</span></div>
+        <div class="cheat-row"><span class="cheat-cmd">kubectl get pods -o json | jq '.items[].spec.containers[].resources'</span><span class="cheat-desc">All container resource settings</span></div>
+        <div class="cheat-row"><span class="cheat-cmd">kubectl api-resources --verbs=list -o name</span><span class="cheat-desc">All listable resource types</span></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ══════════════════════ SECTION 8: HANDS-ON LAB -->
+  <section id="hands-on">
+    <div class="section-num">// 08</div>
+    <h2>Hands-On Lab</h2>
+    <p>Six capstone exercises that bring together everything from the entire learning path. These are production-level challenges — expect them to take time.</p>
+
+    <div class="steps">
+
+      <div class="step">
+        <div class="step-num">1</div>
+        <div class="step-content">
+          <h4>Bootstrap a 3-Node Cluster with kubeadm</h4>
+          <p>Use Vagrant or cloud VMs to create a real multi-node cluster from scratch.</p>
+          <div class="code-block" style="margin-top:0.75rem">
+            <div class="code-header"><div class="code-dots"><span></span><span></span><span></span></div><div class="code-lang">bash</div></div>
+            <pre><span class="c"># Option A: Use Vagrant (local VMs)</span>
+<span class="cm">cat</span> &gt; Vagrantfile &lt;&lt;<span class="v">'EOF'
+Vagrant.configure("2") do |config|
+  (1..3).each do |i|
+    config.vm.define "node#{i}" do |node|
+      node.vm.box = "ubuntu/jammy64"
+      node.vm.network "private_network", ip: "192.168.56.1#{i}"
+      node.vm.provider "virtualbox" do |v|
+        v.memory = 2048; v.cpus = 2
+      end
+    end
+  end
+end
+EOF</span>
+<span class="cm">vagrant</span> up
+
+<span class="c"># SSH into node1 (first control plane)</span>
+<span class="cm">vagrant</span> ssh node1
+
+<span class="c"># Follow the prerequisite setup + kubeadm init steps from Section 1
+# Join node2 and node3 as workers
+# Install Flannel CNI
+# Verify: kubectl get nodes → all Ready</span></pre>
+          </div>
+        </div>
+      </div>
+
+      <div class="step">
+        <div class="step-num">2</div>
+        <div class="step-content">
+          <h4>Write and Deploy a Custom Operator</h4>
+          <p>Create a CRD and a controller that reacts to it.</p>
+          <div class="code-block" style="margin-top:0.75rem">
+            <div class="code-header"><div class="code-dots"><span></span><span></span><span></span></div><div class="code-lang">bash</div></div>
+            <pre><span class="c"># Scaffold operator project</span>
+<span class="cm">mkdir</span> my-operator && <span class="cm">cd</span> my-operator
+<span class="cm">operator-sdk</span> init <span class="fl">--domain</span> example.com \
+  <span class="fl">--repo</span> github.com/myuser/my-operator
+<span class="cm">operator-sdk</span> create api \
+  <span class="fl">--group</span> webapp <span class="fl">--version</span> v1alpha1 \
+  <span class="fl">--kind</span> WebApp <span class="fl">--resource --controller</span>
+
+<span class="c"># Goals for your operator:
+# 1. WebApp CR has spec.replicas and spec.image
+# 2. Controller creates/updates a Deployment + Service
+# 3. Updates status.readyReplicas
+# 4. Test: create a WebApp CR and watch resources appear</span>
+
+<span class="cm">make</span> install run   <span class="c"># run locally</span>
+<span class="cm">kubectl</span> apply <span class="fl">-f</span> - &lt;&lt;<span class="v">EOF
+apiVersion: webapp.example.com/v1alpha1
+kind: WebApp
+metadata:
+  name: test-app
+spec:
+  replicas: 3
+  image: nginx:1.25
+EOF</span>
+<span class="cm">kubectl</span> get webapps
+<span class="cm">kubectl</span> get deploy,svc</pre>
+          </div>
+        </div>
+      </div>
+
+      <div class="step">
+        <div class="step-num">3</div>
+        <div class="step-content">
+          <h4>Deploy Istio and Enable mTLS</h4>
+          <p>Install Istio, enable strict mTLS, and verify traffic is encrypted.</p>
+          <div class="code-block" style="margin-top:0.75rem">
+            <div class="code-header"><div class="code-dots"><span></span><span></span><span></span></div><div class="code-lang">bash</div></div>
+            <pre><span class="cm">istioctl</span> install <span class="fl">--set</span> profile=demo <span class="fl">-y</span>
+<span class="cm">kubectl</span> label namespace default istio-injection=enabled
+
+<span class="c"># Deploy bookinfo sample app (multi-service demo)</span>
+<span class="cm">kubectl</span> apply <span class="fl">-f</span> https://raw.githubusercontent.com/istio/istio/release-1.21/samples/bookinfo/platform/kube/bookinfo.yaml
+
+<span class="c"># Enable strict mTLS</span>
+<span class="cm">kubectl</span> apply <span class="fl">-f</span> - &lt;&lt;<span class="v">EOF
+apiVersion: security.istio.io/v1beta1
+kind: PeerAuthentication
+metadata:
+  name: default
+  namespace: istio-system
+spec:
+  mtls:
+    mode: STRICT
+EOF</span>
+
+<span class="c"># Verify mTLS is working</span>
+<span class="cm">istioctl</span> x check-inject <span class="fl">-n</span> default
+<span class="cm">kubectl</span> exec deploy/productpage-v1 <span class="fl">-c</span> istio-proxy \
+  -- openssl s_client <span class="fl">-connect</span> reviews:9080 <span class="fl">-verify</span> 1
+
+<span class="c"># Open Kiali to visualise the service graph</span>
+<span class="cm">istioctl</span> dashboard kiali</pre>
+          </div>
+        </div>
+      </div>
+
+      <div class="step">
+        <div class="step-num">4</div>
+        <div class="step-content">
+          <h4>Implement OPA Gatekeeper Policies</h4>
+          <p>Install Gatekeeper and enforce two policies: required labels and no-latest-tag.</p>
+          <div class="code-block" style="margin-top:0.75rem">
+            <div class="code-header"><div class="code-dots"><span></span><span></span><span></span></div><div class="code-lang">bash</div></div>
+            <pre><span class="cm">helm</span> install gatekeeper gatekeeper/gatekeeper \
+  <span class="fl">--namespace</span> gatekeeper-system <span class="fl">--create-namespace</span>
+
+<span class="c"># Apply the RequiredLabels template from Section 4
+# Then try deploying without the required labels:</span>
+<span class="cm">kubectl</span> create deployment bad-deploy <span class="fl">--image=nginx</span>
+<span class="out">Error: admission webhook denied:
+  [deployment-must-have-owner] Missing required label: owner</span>
+
+<span class="c"># Create a second ConstraintTemplate: ban 'latest' image tags
+# Hint: check input.review.object.spec.template.spec.containers[_].image</span>
+<span class="cm">kubectl</span> apply <span class="fl">-f</span> no-latest-tag-template.yaml
+<span class="cm">kubectl</span> apply <span class="fl">-f</span> no-latest-tag-constraint.yaml
+
+<span class="c"># Test it</span>
+<span class="cm">kubectl</span> create deployment test <span class="fl">--image=nginx:latest</span>
+<span class="out">Error: image tag "latest" is not allowed</span></pre>
+          </div>
+        </div>
+      </div>
+
+      <div class="step">
+        <div class="step-num">5</div>
+        <div class="step-content">
+          <h4>etcd Backup and Restore Drill</h4>
+          <p>Practice the full backup/restore cycle — the most critical CKA skill.</p>
+          <div class="code-block" style="margin-top:0.75rem">
+            <div class="code-header"><div class="code-dots"><span></span><span></span><span></span></div><div class="code-lang">bash</div></div>
+            <pre><span class="c"># 1. Create some resources to prove they survive restore</span>
+<span class="cm">kubectl</span> create deployment test-restore <span class="fl">--image=nginx --replicas=3</span>
+<span class="cm">kubectl</span> create configmap important-config <span class="fl">--from-literal=key=value</span>
+
+<span class="c"># 2. Take a snapshot</span>
+<span class="cm">export</span> ETCDCTL_API=3
+<span class="cm">etcdctl</span> <span class="fl">--endpoints=https://127.0.0.1:2379</span> \
+  <span class="fl">--cacert=/etc/kubernetes/pki/etcd/ca.crt</span> \
+  <span class="fl">--cert=/etc/kubernetes/pki/etcd/server.crt</span> \
+  <span class="fl">--key=/etc/kubernetes/pki/etcd/server.key</span> \
+  snapshot save /tmp/backup.db
+
+<span class="c"># 3. Simulate disaster — delete something important</span>
+<span class="cm">kubectl</span> delete deployment test-restore
+<span class="cm">kubectl</span> delete configmap important-config
+
+<span class="c"># 4. Restore from snapshot (follow Section 5 restore procedure)
+
+# 5. Verify resources are back</span>
+<span class="cm">kubectl</span> get deployment test-restore
+<span class="cm">kubectl</span> get configmap important-config</pre>
+          </div>
+        </div>
+      </div>
+
+      <div class="step">
+        <div class="step-num">6</div>
+        <div class="step-content">
+          <h4>Multi-Cluster GitOps with ArgoCD ApplicationSet</h4>
+          <p>Register two clusters in ArgoCD and deploy to both with one ApplicationSet.</p>
+          <div class="code-block" style="margin-top:0.75rem">
+            <div class="code-header"><div class="code-dots"><span></span><span></span><span></span></div><div class="code-lang">bash</div></div>
+            <pre><span class="c"># Create two local clusters (use kind)</span>
+<span class="cm">kind</span> create cluster <span class="fl">--name</span> cluster-a
+<span class="cm">kind</span> create cluster <span class="fl">--name</span> cluster-b
+
+<span class="c"># Install ArgoCD on cluster-a (hub)</span>
+<span class="cm">kubectl</span> config use-context kind-cluster-a
+<span class="cm">kubectl</span> create namespace argocd
+<span class="cm">kubectl</span> apply <span class="fl">-n</span> argocd \
+  <span class="fl">-f</span> https://raw.githubusercontent.com/argoproj/argo-cd/stable/manifests/install.yaml
+
+<span class="c"># Register cluster-b with ArgoCD</span>
+<span class="cm">argocd</span> cluster add kind-cluster-b
+<span class="cm">argocd</span> cluster list
+
+<span class="c"># Apply an ApplicationSet that deploys guestbook to both</span>
+<span class="cm">kubectl</span> apply <span class="fl">-f</span> applicationset.yaml <span class="fl">-n</span> argocd
+
+<span class="c"># Verify apps appear on both clusters</span>
+<span class="cm">kubectl</span> config use-context kind-cluster-a
+<span class="cm">kubectl</span> get pods <span class="fl">-n</span> guestbook
+
+<span class="cm">kubectl</span> config use-context kind-cluster-b
+<span class="cm">kubectl</span> get pods <span class="fl">-n</span> guestbook</pre>
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- QUIZ -->
+    <div class="quiz">
+      <div class="quiz-title">// Stage 5 Knowledge Check</div>
+
+      <div class="quiz-q">
+        <p>1. In a 5-node etcd cluster, how many nodes can fail before the cluster loses quorum?</p>
+        <div class="quiz-options">
+          <button class="quiz-opt" onclick="answer(this,false)">1 node</button>
+          <button class="quiz-opt" onclick="answer(this,true)">2 nodes — quorum requires (5/2)+1 = 3 nodes</button>
+          <button class="quiz-opt" onclick="answer(this,false)">3 nodes</button>
+          <button class="quiz-opt" onclick="answer(this,false)">It never loses quorum with 5 nodes</button>
+        </div>
+      </div>
+
+      <div class="quiz-q">
+        <p>2. What is the difference between an Istio <code>VirtualService</code> and a <code>DestinationRule</code>?</p>
+        <div class="quiz-options">
+          <button class="quiz-opt" onclick="answer(this,false)">VirtualService replaces K8s Services; DestinationRule replaces Ingress</button>
+          <button class="quiz-opt" onclick="answer(this,true)">VirtualService controls routing rules (traffic splitting, retries, timeouts); DestinationRule configures connection policies and defines subsets for endpoints</button>
+          <button class="quiz-opt" onclick="answer(this,false)">They are equivalent — use either one</button>
+          <button class="quiz-opt" onclick="answer(this,false)">VirtualService works at L4; DestinationRule works at L7</button>
+        </div>
+      </div>
+
+      <div class="quiz-q">
+        <p>3. Where do kubeadm control plane components (API server, scheduler, etcd) run?</p>
+        <div class="quiz-options">
+          <button class="quiz-opt" onclick="answer(this,false)">As Deployments in the kube-system namespace</button>
+          <button class="quiz-opt" onclick="answer(this,false)">As OS systemd services on the control plane node</button>
+          <button class="quiz-opt" onclick="answer(this,true)">As static Pods — managed by kubelet directly from manifests in /etc/kubernetes/manifests/</button>
+          <button class="quiz-opt" onclick="answer(this,false)">As DaemonSets that run on every node</button>
+        </div>
+      </div>
+
+      <div class="quiz-q">
+        <p>4. What does the Operator reconcile loop's <strong>return value</strong> <code>ctrl.Result{RequeueAfter: 30s}</code> tell controller-runtime?</p>
+        <div class="quiz-options">
+          <button class="quiz-opt" onclick="answer(this,false)">Wait 30 seconds before accepting any new resources</button>
+          <button class="quiz-opt" onclick="answer(this,true)">Requeue this object's reconciliation after 30 seconds — used for drift detection and periodic re-sync</button>
+          <button class="quiz-opt" onclick="answer(this,false)">Timeout the current reconcile if it runs longer than 30 seconds</button>
+          <button class="quiz-opt" onclick="answer(this,false)">Rate-limit reconciliation to once per 30 seconds globally</button>
+        </div>
+      </div>
+
+      <div class="quiz-q">
+        <p>5. OPA Gatekeeper uses two CRDs to enforce policy. What are they and how do they relate?</p>
+        <div class="quiz-options">
+          <button class="quiz-opt" onclick="answer(this,false)">PolicyRule (defines logic) and PolicyBinding (applies to namespaces)</button>
+          <button class="quiz-opt" onclick="answer(this,false)">AdmissionWebhook (registers hook) and Policy (contains Rego rules)</button>
+          <button class="quiz-opt" onclick="answer(this,true)">ConstraintTemplate (defines the Rego logic and creates a new CRD kind) and Constraint (an instance of that kind specifying what to match and enforce)</button>
+          <button class="quiz-opt" onclick="answer(this,false)">OpaPolicy (the Rego code) and OpaScope (which resources it targets)</button>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- COMPLETION BANNER -->
+    <div class="completion-banner">
+      <div class="trophy">🏆</div>
+      <h3>You've Completed the Kubernetes Learning Path</h3>
+      <p>From Linux basics in Stage 1 through building clusters from scratch, writing Operators, securing with Istio and OPA, managing etcd, and orchestrating multi-cluster deployments — you now have a production-grade Kubernetes skill set.</p>
+      <div style="margin-top:1.5rem;display:flex;gap:0.75rem;justify-content:center;flex-wrap:wrap">
+        <span class="tag purple">Stage 1 ✓ Prerequisites</span>
+        <span class="tag indigo">Stage 2 ✓ Core Concepts</span>
+        <span class="tag green">Stage 3 ✓ Intermediate</span>
+        <span class="tag amber">Stage 4 ✓ Operations</span>
+        <span class="tag pink">Stage 5 ✓ Advanced</span>
+      </div>
+      <p style="margin-top:1.5rem;font-size:0.82rem">Next: Consider the <strong>CKA</strong> (Certified Kubernetes Administrator) or <strong>CKAD</strong> (Certified Kubernetes Application Developer) exam to validate your skills.</p>
+    </div>
+
+  </section>
+
+</div>
+</main>
+
+<footer>
+  <div class="container">
+    <div class="footer-text">KUBERNETES CRASH COURSE · STAGE 5 · ADVANCED MASTERY</div>
+    <div style="margin-top:0.5rem;font-family:'JetBrains Mono',monospace;font-size:0.65rem;color:#2a2040">
+      kubernetes.io/docs &nbsp;·&nbsp; istio.io &nbsp;·&nbsp; operatorframework.io &nbsp;·&nbsp; openpolicyagent.org &nbsp;·&nbsp; falco.org
+    </div>
+  </div>
+</footer>
+
+<script>
+  window.addEventListener('scroll', () => {
+    const h = document.documentElement.scrollHeight - window.innerHeight;
+    document.getElementById('progress-bar').style.width = (window.scrollY / h * 100) + '%';
+  });
+
+  const obs = new IntersectionObserver(entries => {
+    entries.forEach(e => { if (e.isIntersecting) e.target.classList.add('visible'); });
+  }, { threshold: 0.05 });
+  document.querySelectorAll('section').forEach(s => obs.observe(s));
+
+  function answer(btn, correct) {
+    const g = btn.closest('.quiz-options');
+    if (g.dataset.answered) return;
+    g.dataset.answered = '1';
+    btn.classList.add(correct ? 'correct' : 'wrong');
+    g.querySelectorAll('.quiz-opt').forEach(b => {
+      b.style.pointerEvents = 'none';
+      if (!correct && b !== btn) b.style.opacity = '0.35';
+    });
+  }
+</script>
+</body>
+</html>

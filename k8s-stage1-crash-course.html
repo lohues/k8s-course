@@ -1,0 +1,1842 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Kubernetes Stage 1 — Prerequisites Crash Course</title>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;600;700&family=Syne:wght@400;600;700;800&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0a0e1a;
+    --surface: #0f1525;
+    --surface2: #161d33;
+    --border: #1e2a47;
+    --accent: #f97316;
+    --accent2: #10b981;
+    --accent3: #00d4ff;
+    --accent4: #f59e0b;
+    --accent5: #a78bfa;
+    --text: #e2e8f0;
+    --muted: #64748b;
+    --danger: #ef4444;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Syne', sans-serif;
+    line-height: 1.7;
+    overflow-x: hidden;
+  }
+
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background:
+      radial-gradient(ellipse 70% 50% at 10% 20%, rgba(249,115,22,0.06) 0%, transparent 60%),
+      radial-gradient(ellipse 60% 40% at 90% 70%, rgba(16,185,129,0.06) 0%, transparent 60%);
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .container {
+    max-width: 960px;
+    margin: 0 auto;
+    padding: 0 2rem;
+    position: relative;
+    z-index: 1;
+  }
+
+  /* PROGRESS */
+  .progress-bar-container {
+    position: fixed;
+    top: 0; left: 0; right: 0;
+    height: 2px;
+    background: var(--border);
+    z-index: 100;
+  }
+  #progress-bar {
+    height: 100%;
+    background: linear-gradient(90deg, var(--accent), var(--accent2));
+    width: 0%;
+    transition: width 0.1s;
+  }
+
+  /* HEADER */
+  header {
+    padding: 5rem 0 4rem;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .stage-nav {
+    display: flex;
+    gap: 0.5rem;
+    margin-bottom: 2rem;
+    flex-wrap: wrap;
+  }
+
+  .stage-pill {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.65rem;
+    letter-spacing: 0.1em;
+    padding: 0.3rem 0.75rem;
+    border-radius: 20px;
+    border: 1px solid var(--border);
+    color: var(--muted);
+  }
+
+  .stage-pill.active {
+    border-color: rgba(249,115,22,0.5);
+    background: rgba(249,115,22,0.1);
+    color: var(--accent);
+  }
+
+  .badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    background: rgba(249,115,22,0.1);
+    border: 1px solid rgba(249,115,22,0.3);
+    color: var(--accent);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.7rem;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    padding: 0.35rem 0.9rem;
+    border-radius: 2px;
+    margin-bottom: 2rem;
+    animation: pulse-border 3s ease-in-out infinite;
+  }
+
+  @keyframes pulse-border {
+    0%, 100% { box-shadow: none; }
+    50% { box-shadow: 0 0 14px rgba(249,115,22,0.2); }
+  }
+
+  .badge::before {
+    content: '●';
+    color: var(--accent2);
+    font-size: 0.6rem;
+    animation: blink 1.5s step-end infinite;
+  }
+  @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0} }
+
+  h1 {
+    font-size: clamp(2.4rem, 5vw, 4rem);
+    font-weight: 800;
+    letter-spacing: -0.02em;
+    line-height: 1.1;
+    margin-bottom: 1.5rem;
+  }
+
+  h1 span.orange { color: var(--accent); }
+  h1 span.green  { color: var(--accent2); }
+
+  .subtitle {
+    font-size: 1.05rem;
+    color: var(--muted);
+    max-width: 620px;
+    font-weight: 400;
+    line-height: 1.7;
+  }
+
+  .meta-bar {
+    display: flex;
+    gap: 2rem;
+    margin-top: 2.5rem;
+    flex-wrap: wrap;
+  }
+
+  .meta-item {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.75rem;
+    color: var(--muted);
+  }
+
+  .meta-dot {
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+
+  /* TOC */
+  .toc {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-left: 3px solid var(--accent);
+    padding: 2rem;
+    margin: 3rem 0;
+    border-radius: 0 4px 4px 0;
+  }
+
+  .toc-title {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.7rem;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin-bottom: 1.2rem;
+  }
+
+  .toc-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(210px, 1fr));
+    gap: 0.4rem;
+  }
+
+  .toc-link {
+    color: var(--muted);
+    text-decoration: none;
+    font-size: 0.85rem;
+    padding: 0.3rem 0;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    transition: color 0.2s;
+  }
+
+  .toc-link:hover { color: var(--accent); }
+  .toc-link::before { content: '→'; font-size: 0.7rem; opacity: 0.5; }
+
+  /* SECTIONS */
+  section {
+    padding: 4rem 0;
+    border-bottom: 1px solid var(--border);
+    opacity: 0;
+    transform: translateY(20px);
+    transition: opacity 0.5s ease, transform 0.5s ease;
+  }
+
+  section.visible {
+    opacity: 1;
+    transform: translateY(0);
+  }
+
+  .section-num {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.7rem;
+    color: var(--accent);
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    margin-bottom: 0.5rem;
+  }
+
+  h2 {
+    font-size: clamp(1.6rem, 3vw, 2.2rem);
+    font-weight: 700;
+    margin-bottom: 1.5rem;
+    letter-spacing: -0.01em;
+  }
+
+  h3 {
+    font-size: 1.05rem;
+    font-weight: 600;
+    color: var(--accent);
+    margin: 2.5rem 0 0.75rem;
+    font-family: 'JetBrains Mono', monospace;
+  }
+
+  h4 {
+    font-size: 0.95rem;
+    font-weight: 600;
+    color: var(--text);
+    margin: 1.5rem 0 0.5rem;
+  }
+
+  p {
+    color: #94a3b8;
+    margin-bottom: 1rem;
+    font-size: 0.95rem;
+    line-height: 1.75;
+  }
+
+  strong { color: var(--text); font-weight: 600; }
+
+  /* CODE */
+  .code-block {
+    background: #070c18;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    margin: 1.5rem 0;
+    overflow: hidden;
+  }
+
+  .code-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.6rem 1rem;
+    background: var(--surface2);
+    border-bottom: 1px solid var(--border);
+  }
+
+  .code-lang {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.65rem;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+
+  .code-dots { display: flex; gap: 5px; }
+  .code-dots span { width: 8px; height: 8px; border-radius: 50%; }
+  .code-dots span:nth-child(1) { background: #ff5f56; }
+  .code-dots span:nth-child(2) { background: #ffbd2e; }
+  .code-dots span:nth-child(3) { background: #27c93f; }
+
+  pre {
+    padding: 1.5rem;
+    overflow-x: auto;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.8rem;
+    line-height: 1.85;
+  }
+
+  .cmd  { color: #10b981; }
+  .flag { color: #f59e0b; }
+  .str  { color: #34d399; }
+  .cmt  { color: #374151; font-style: italic; }
+  .key  { color: #00d4ff; }
+  .num  { color: #f59e0b; }
+  .out  { color: #64748b; }
+  .hl   { color: #f97316; }
+  .wht  { color: #e2e8f0; }
+  .err  { color: #ef4444; }
+
+  /* CARDS */
+  .card-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+    gap: 1rem;
+    margin: 1.5rem 0;
+  }
+
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 1.5rem;
+    transition: border-color 0.2s, transform 0.2s;
+  }
+
+  .card:hover {
+    border-color: var(--accent);
+    transform: translateY(-2px);
+  }
+
+  .card-icon { font-size: 1.5rem; margin-bottom: 0.75rem; }
+  .card-name {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.85rem;
+    color: var(--accent);
+    font-weight: 600;
+    margin-bottom: 0.5rem;
+  }
+  .card-desc { font-size: 0.82rem; color: var(--muted); line-height: 1.6; }
+
+  /* CALLOUTS */
+  .callout {
+    border-left: 3px solid;
+    padding: 1rem 1.5rem;
+    margin: 1.5rem 0;
+    border-radius: 0 6px 6px 0;
+    font-size: 0.88rem;
+  }
+  .callout.tip    { border-color: var(--accent2); background: rgba(16,185,129,0.05); }
+  .callout.warn   { border-color: var(--accent4); background: rgba(245,158,11,0.05); }
+  .callout.info   { border-color: var(--accent3); background: rgba(0,212,255,0.05); }
+  .callout.orange { border-color: var(--accent);  background: rgba(249,115,22,0.05); }
+
+  .callout-label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.65rem;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    margin-bottom: 0.4rem;
+    font-weight: 700;
+  }
+  .callout.tip    .callout-label { color: var(--accent2); }
+  .callout.warn   .callout-label { color: var(--accent4); }
+  .callout.info   .callout-label { color: var(--accent3); }
+  .callout.orange .callout-label { color: var(--accent); }
+  .callout p { color: #94a3b8; margin: 0; }
+
+  /* TABLE */
+  .data-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 1.5rem 0;
+    font-size: 0.82rem;
+  }
+
+  .data-table th {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.65rem;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    color: var(--muted);
+    text-align: left;
+    padding: 0.6rem 1rem;
+    border-bottom: 1px solid var(--border);
+    background: var(--surface);
+  }
+
+  .data-table td {
+    padding: 0.75rem 1rem;
+    border-bottom: 1px solid rgba(30,42,71,0.6);
+    color: #94a3b8;
+    vertical-align: top;
+  }
+
+  .data-table tr:hover td { background: rgba(249,115,22,0.02); }
+
+  .data-table code {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.78rem;
+    color: var(--accent2);
+    background: rgba(16,185,129,0.08);
+    padding: 0.15rem 0.4rem;
+    border-radius: 3px;
+  }
+
+  /* TAGS */
+  .tag {
+    display: inline-block;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.65rem;
+    padding: 0.2rem 0.6rem;
+    border-radius: 2px;
+    margin: 0.2rem;
+    letter-spacing: 0.05em;
+  }
+  .tag.orange { background: rgba(249,115,22,0.1);  color: var(--accent);  border: 1px solid rgba(249,115,22,0.25); }
+  .tag.green  { background: rgba(16,185,129,0.1);  color: var(--accent2); border: 1px solid rgba(16,185,129,0.2); }
+  .tag.blue   { background: rgba(0,212,255,0.1);   color: var(--accent3); border: 1px solid rgba(0,212,255,0.2); }
+  .tag.yellow { background: rgba(245,158,11,0.1);  color: var(--accent4); border: 1px solid rgba(245,158,11,0.2); }
+  .tag.purple { background: rgba(167,139,250,0.1); color: var(--accent5); border: 1px solid rgba(167,139,250,0.2); }
+
+  /* DIAGRAM */
+  .diagram {
+    background: #070c18;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 2rem;
+    margin: 1.5rem 0;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.75rem;
+    overflow-x: auto;
+  }
+
+  .diagram-label {
+    font-size: 0.62rem;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 1.5rem;
+  }
+
+  .d-row {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    margin-bottom: 0.75rem;
+    flex-wrap: wrap;
+  }
+
+  .d-box {
+    border: 1px solid;
+    border-radius: 5px;
+    padding: 0.6rem 1rem;
+    text-align: center;
+    min-width: 110px;
+    line-height: 1.4;
+  }
+
+  .d-box.orange { border-color: rgba(249,115,22,0.4);  background: rgba(249,115,22,0.04);  color: var(--accent); }
+  .d-box.green  { border-color: rgba(16,185,129,0.4);  background: rgba(16,185,129,0.04);  color: var(--accent2); }
+  .d-box.blue   { border-color: rgba(0,212,255,0.4);   background: rgba(0,212,255,0.04);   color: var(--accent3); }
+  .d-box.yellow { border-color: rgba(245,158,11,0.4);  background: rgba(245,158,11,0.04);  color: var(--accent4); }
+  .d-box.purple { border-color: rgba(167,139,250,0.4); background: rgba(167,139,250,0.04); color: var(--accent5); }
+  .d-box.gray   { border-color: var(--border);         background: var(--surface2);        color: var(--muted); }
+
+  .d-arrow { color: var(--muted); font-size: 1rem; flex-shrink: 0; }
+
+  /* FILESYSTEM TREE */
+  .fs-tree {
+    background: #070c18;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 1.5rem;
+    margin: 1.5rem 0;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.78rem;
+    line-height: 2;
+  }
+
+  .fs-dir  { color: var(--accent3); }
+  .fs-file { color: #94a3b8; }
+  .fs-note { color: var(--muted); font-style: italic; margin-left: 1rem; }
+
+  /* CHEAT SHEET */
+  .cheat-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: 1rem;
+    margin: 1.5rem 0;
+  }
+
+  .cheat-box {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    overflow: hidden;
+  }
+
+  .cheat-box-title {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.65rem;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    padding: 0.6rem 1rem;
+    background: var(--surface2);
+    border-bottom: 1px solid var(--border);
+  }
+
+  .cheat-box.orange-top { border-top: 2px solid var(--accent);  }
+  .cheat-box.green-top  { border-top: 2px solid var(--accent2); }
+  .cheat-box.blue-top   { border-top: 2px solid var(--accent3); }
+  .cheat-box.yellow-top { border-top: 2px solid var(--accent4); }
+  .cheat-box.purple-top { border-top: 2px solid var(--accent5); }
+
+  .cheat-box.orange-top .cheat-box-title { color: var(--accent); }
+  .cheat-box.green-top  .cheat-box-title { color: var(--accent2); }
+  .cheat-box.blue-top   .cheat-box-title { color: var(--accent3); }
+  .cheat-box.yellow-top .cheat-box-title { color: var(--accent4); }
+  .cheat-box.purple-top .cheat-box-title { color: var(--accent5); }
+
+  .cheat-row {
+    display: flex;
+    align-items: baseline;
+    gap: 0.75rem;
+    padding: 0.45rem 1rem;
+    border-bottom: 1px solid rgba(30,42,71,0.5);
+    font-size: 0.78rem;
+  }
+
+  .cheat-row:last-child { border-bottom: none; }
+
+  .cheat-cmd {
+    font-family: 'JetBrains Mono', monospace;
+    color: var(--accent2);
+    white-space: nowrap;
+    min-width: 120px;
+    flex-shrink: 0;
+    font-size: 0.75rem;
+  }
+
+  .cheat-desc { color: var(--muted); line-height: 1.4; }
+
+  /* COMPARE */
+  .compare {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1rem;
+    margin: 1.5rem 0;
+  }
+
+  .compare-col {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 1.25rem;
+  }
+
+  .compare-col-title {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.7rem;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    margin-bottom: 1rem;
+    padding-bottom: 0.75rem;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .compare-col.orange-border { border-top: 2px solid var(--accent);  }
+  .compare-col.orange-border .compare-col-title { color: var(--accent); }
+  .compare-col.green-border  { border-top: 2px solid var(--accent2); }
+  .compare-col.green-border  .compare-col-title { color: var(--accent2); }
+
+  .compare-item {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.5rem;
+    margin-bottom: 0.5rem;
+    font-size: 0.82rem;
+    color: #94a3b8;
+  }
+
+  .compare-item::before { content: '·'; color: var(--muted); flex-shrink: 0; }
+
+  /* STEPS */
+  .steps { margin: 1.5rem 0; }
+
+  .step {
+    display: flex;
+    gap: 1.5rem;
+    margin-bottom: 2rem;
+    align-items: flex-start;
+  }
+
+  .step-num {
+    flex-shrink: 0;
+    width: 36px; height: 36px;
+    border: 2px solid var(--accent);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.8rem;
+    color: var(--accent);
+    font-weight: 700;
+  }
+
+  .step-content h4 { font-size: 1rem; font-weight: 600; margin-bottom: 0.4rem; }
+  .step-content p  { font-size: 0.85rem; margin: 0 0 0.5rem; }
+
+  /* QUIZ */
+  .quiz {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 2rem;
+    margin: 2rem 0;
+  }
+
+  .quiz-title {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.7rem;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--accent4);
+    margin-bottom: 1.5rem;
+  }
+
+  .quiz-q { margin-bottom: 1.5rem; }
+
+  .quiz-q p {
+    color: var(--text);
+    font-weight: 600;
+    font-size: 0.9rem;
+    margin-bottom: 0.75rem;
+  }
+
+  .quiz-options { display: flex; flex-direction: column; gap: 0.4rem; }
+
+  .quiz-opt {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 0.6rem 1rem;
+    font-size: 0.82rem;
+    cursor: pointer;
+    transition: all 0.15s;
+    color: #94a3b8;
+    text-align: left;
+    font-family: 'Syne', sans-serif;
+  }
+
+  .quiz-opt:hover { border-color: var(--accent); color: var(--text); }
+  .quiz-opt.correct { border-color: var(--accent2); background: rgba(16,185,129,0.1);  color: var(--accent2); pointer-events: none; }
+  .quiz-opt.wrong   { border-color: var(--danger);  background: rgba(239,68,68,0.1);   color: var(--danger);  pointer-events: none; }
+
+  /* YAML INLINE HIGHLIGHT */
+  .yaml-key  { color: #00d4ff; }
+  .yaml-val  { color: #34d399; }
+  .yaml-cmt  { color: #374151; font-style: italic; }
+  .yaml-num  { color: #f59e0b; }
+  .yaml-bool { color: #a78bfa; }
+
+  /* INLINE CODE */
+  code {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.82em;
+    color: var(--accent2);
+    background: rgba(16,185,129,0.08);
+    padding: 0.1rem 0.35rem;
+    border-radius: 3px;
+  }
+
+  /* FOOTER */
+  footer {
+    padding: 3rem 0;
+    text-align: center;
+  }
+
+  .footer-text {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.7rem;
+    color: var(--muted);
+    letter-spacing: 0.1em;
+  }
+
+  @media (max-width: 600px) {
+    .compare    { grid-template-columns: 1fr; }
+    .card-grid  { grid-template-columns: 1fr; }
+    .cheat-grid { grid-template-columns: 1fr; }
+    .d-row      { flex-direction: column; }
+  }
+</style>
+</head>
+<body>
+
+<div class="progress-bar-container"><div id="progress-bar"></div></div>
+
+<!-- ═══════════════════════════════════════════ HEADER -->
+<header>
+  <div class="container">
+    <div class="stage-nav">
+      <div class="stage-pill active">Stage 1 · Prerequisites ←</div>
+      <div class="stage-pill">Stage 2 · Core Concepts</div>
+      <div class="stage-pill">Stage 3 · Intermediate</div>
+      <div class="stage-pill">Stage 4 · Operations</div>
+      <div class="stage-pill">Stage 5 · Advanced</div>
+    </div>
+    <div class="badge">Stage 1 · Prerequisites</div>
+    <h1>Before<br><span class="orange">Kubernetes</span>,<br>master the <span class="green">foundation</span></h1>
+    <p class="subtitle">Linux, Docker, Networking, YAML, and the CLI — the five pillars every Kubernetes practitioner must have locked down before touching a cluster.</p>
+    <div class="meta-bar">
+      <div class="meta-item"><div class="meta-dot" style="background:var(--accent)"></div> 5 Core Topics</div>
+      <div class="meta-item"><div class="meta-dot" style="background:var(--accent4)"></div> ~5–6 Hours</div>
+      <div class="meta-item"><div class="meta-dot" style="background:var(--accent2)"></div> Complete Beginner Friendly</div>
+      <div class="meta-item"><div class="meta-dot" style="background:var(--accent3)"></div> Start Here</div>
+    </div>
+  </div>
+</header>
+
+<main>
+<div class="container">
+
+  <nav class="toc">
+    <div class="toc-title">// Table of Contents</div>
+    <div class="toc-grid">
+      <a href="#linux" class="toc-link">Linux Basics</a>
+      <a href="#docker" class="toc-link">Docker & Containers</a>
+      <a href="#networking" class="toc-link">Networking Fundamentals</a>
+      <a href="#yaml" class="toc-link">YAML</a>
+      <a href="#cli" class="toc-link">CLI Productivity</a>
+      <a href="#hands-on" class="toc-link">Hands-On Lab</a>
+    </div>
+  </nav>
+
+  <!-- ═══════════════════════════════ SECTION 1: LINUX -->
+  <section id="linux">
+    <div class="section-num">// 01</div>
+    <h2>Linux Basics</h2>
+    <p>Kubernetes runs on Linux. Every node in your cluster is a Linux machine. Understanding the filesystem, processes, permissions, and basic commands is non-negotiable.</p>
+
+    <h3>// The Filesystem</h3>
+    <p>Linux has one unified directory tree starting at <code>/</code>. Everything — devices, processes, configs, logs — is a file somewhere in this tree.</p>
+
+    <div class="fs-tree">
+      <div><span class="fs-dir">/</span> <span class="fs-note">root of the entire filesystem</span></div>
+      <div>├── <span class="fs-dir">bin/</span>   <span class="fs-note">essential binaries (ls, cp, bash)</span></div>
+      <div>├── <span class="fs-dir">etc/</span>   <span class="fs-note">system-wide config files</span></div>
+      <div>├── <span class="fs-dir">home/</span>  <span class="fs-note">user home directories</span></div>
+      <div>├── <span class="fs-dir">proc/</span>  <span class="fs-note">virtual FS — running process info (used by K8s!)</span></div>
+      <div>├── <span class="fs-dir">sys/</span>   <span class="fs-note">virtual FS — kernel/hardware info</span></div>
+      <div>├── <span class="fs-dir">tmp/</span>   <span class="fs-note">temporary files, cleared on reboot</span></div>
+      <div>├── <span class="fs-dir">usr/</span>   <span class="fs-note">user-installed programs and libraries</span></div>
+      <div>├── <span class="fs-dir">var/</span>   <span class="fs-note">logs, caches, runtime data</span></div>
+      <div>│   └── <span class="fs-dir">log/</span>  <span class="fs-note">system and app logs (syslog, auth.log)</span></div>
+      <div>└── <span class="fs-dir">mnt/</span>   <span class="fs-note">mount points for volumes (important in K8s!)</span></div>
+    </div>
+
+    <h3>// Essential File & Navigation Commands</h3>
+
+    <div class="cheat-grid">
+      <div class="cheat-box orange-top">
+        <div class="cheat-box-title">Navigation</div>
+        <div class="cheat-row"><span class="cheat-cmd">pwd</span><span class="cheat-desc">Print current working directory</span></div>
+        <div class="cheat-row"><span class="cheat-cmd">ls -la</span><span class="cheat-desc">List all files with permissions and sizes</span></div>
+        <div class="cheat-row"><span class="cheat-cmd">cd /path</span><span class="cheat-desc">Change to absolute path</span></div>
+        <div class="cheat-row"><span class="cheat-cmd">cd ~</span><span class="cheat-desc">Go to home directory</span></div>
+        <div class="cheat-row"><span class="cheat-cmd">cd -</span><span class="cheat-desc">Go back to previous directory</span></div>
+        <div class="cheat-row"><span class="cheat-cmd">find / -name "*.log"</span><span class="cheat-desc">Find files by name recursively</span></div>
+      </div>
+
+      <div class="cheat-box green-top">
+        <div class="cheat-box-title">File Operations</div>
+        <div class="cheat-row"><span class="cheat-cmd">cat file.txt</span><span class="cheat-desc">Print file contents</span></div>
+        <div class="cheat-row"><span class="cheat-cmd">less file.txt</span><span class="cheat-desc">Scrollable file viewer (q to quit)</span></div>
+        <div class="cheat-row"><span class="cheat-cmd">cp src dest</span><span class="cheat-desc">Copy file or directory (-r for dirs)</span></div>
+        <div class="cheat-row"><span class="cheat-cmd">mv src dest</span><span class="cheat-desc">Move or rename a file</span></div>
+        <div class="cheat-row"><span class="cheat-cmd">rm -rf dir/</span><span class="cheat-desc">Delete directory and contents (careful!)</span></div>
+        <div class="cheat-row"><span class="cheat-cmd">mkdir -p a/b/c</span><span class="cheat-desc">Create nested directories</span></div>
+      </div>
+
+      <div class="cheat-box blue-top">
+        <div class="cheat-box-title">Viewing & Searching Text</div>
+        <div class="cheat-row"><span class="cheat-cmd">grep "error" app.log</span><span class="cheat-desc">Search for pattern in file</span></div>
+        <div class="cheat-row"><span class="cheat-cmd">grep -r "TODO" ./src</span><span class="cheat-desc">Recursive search in directory</span></div>
+        <div class="cheat-row"><span class="cheat-cmd">tail -f app.log</span><span class="cheat-desc">Follow log file in real-time</span></div>
+        <div class="cheat-row"><span class="cheat-cmd">head -n 20 file</span><span class="cheat-desc">Show first 20 lines</span></div>
+        <div class="cheat-row"><span class="cheat-cmd">wc -l file</span><span class="cheat-desc">Count lines in file</span></div>
+        <div class="cheat-row"><span class="cheat-cmd">sort | uniq -c</span><span class="cheat-desc">Sort and count unique lines</span></div>
+      </div>
+
+      <div class="cheat-box yellow-top">
+        <div class="cheat-box-title">Processes</div>
+        <div class="cheat-row"><span class="cheat-cmd">ps aux</span><span class="cheat-desc">List all running processes</span></div>
+        <div class="cheat-row"><span class="cheat-cmd">top / htop</span><span class="cheat-desc">Live process monitor (htop is prettier)</span></div>
+        <div class="cheat-row"><span class="cheat-cmd">kill -9 PID</span><span class="cheat-desc">Force-kill process by ID</span></div>
+        <div class="cheat-row"><span class="cheat-cmd">pkill nginx</span><span class="cheat-desc">Kill process by name</span></div>
+        <div class="cheat-row"><span class="cheat-cmd">lsof -i :8080</span><span class="cheat-desc">Which process is using port 8080?</span></div>
+        <div class="cheat-row"><span class="cheat-cmd">systemctl status nginx</span><span class="cheat-desc">Check service status</span></div>
+      </div>
+    </div>
+
+    <h3>// File Permissions</h3>
+    <p>Every file has permissions for three actors: the <strong>owner</strong>, the <strong>group</strong>, and <strong>others</strong>. Kubernetes uses this heavily for mounted secrets and config files.</p>
+
+    <div class="code-block">
+      <div class="code-header"><div class="code-dots"><span></span><span></span><span></span></div><div class="code-lang">bash · understanding permissions</div></div>
+      <pre><span class="cmt"># Output from: ls -la</span>
+<span class="out">-rwxr-xr--  1 alice devs  4096  Feb 25 10:00  script.sh</span>
+<span class="cmt"> ↑↑↑↑↑↑↑↑↑
+ │└──┬──┘└──┬──┘└──┬──┘
+ │ owner  group  others
+ └─ file type: - (file), d (dir), l (symlink)</span>
+
+<span class="cmt"># r=read(4) w=write(2) x=execute(1)</span>
+<span class="cmt"># rwxr-xr-- means: owner=rwx(7) group=r-x(5) others=r--(4) → 754</span>
+
+<span class="cmt"># Change permissions (chmod)</span>
+<span class="cmd">chmod</span> <span class="num">755</span> script.sh       <span class="cmt"># numeric: rwxr-xr-x</span>
+<span class="cmd">chmod</span> <span class="flag">+x</span> script.sh        <span class="cmt"># add execute for all</span>
+<span class="cmd">chmod</span> <span class="flag">600</span> secret.key      <span class="cmt"># owner read/write only (for SSH keys)</span>
+
+<span class="cmt"># Change owner (chown)</span>
+<span class="cmd">chown</span> alice:devs file.txt  <span class="cmt"># change owner and group</span>
+<span class="cmd">chown</span> <span class="flag">-R</span> alice ./dir/     <span class="cmt"># recursively</span></pre>
+    </div>
+
+    <h3>// Environment Variables</h3>
+    <p>Kubernetes injects configuration into containers via environment variables. Understanding how they work in Linux is essential.</p>
+
+    <div class="code-block">
+      <div class="code-header"><div class="code-dots"><span></span><span></span><span></span></div><div class="code-lang">bash · env vars</div></div>
+      <pre><span class="cmt"># View all env vars</span>
+<span class="cmd">env</span>
+<span class="cmd">printenv</span>
+
+<span class="cmt"># Set a variable for current session</span>
+<span class="cmd">export</span> DATABASE_URL=<span class="str">"postgres://localhost/mydb"</span>
+<span class="cmd">echo</span> <span class="str">$DATABASE_URL</span>
+<span class="out">postgres://localhost/mydb</span>
+
+<span class="cmt"># Set variable permanently (add to ~/.bashrc or ~/.zshrc)</span>
+<span class="cmd">echo</span> <span class="str">'export MY_VAR=hello'</span> >> ~/.bashrc
+<span class="cmd">source</span> ~/.bashrc
+
+<span class="cmt"># Run command with a temporary env var</span>
+<span class="cmd">DEBUG=true</span> node server.js
+
+<span class="cmt"># In K8s, you'll see containers read env vars like this:</span>
+<span class="out">DB_HOST=postgres-service
+DB_PORT=5432
+APP_ENV=production</span></pre>
+    </div>
+
+    <h3>// Useful Text Processing</h3>
+
+    <div class="code-block">
+      <div class="code-header"><div class="code-dots"><span></span><span></span><span></span></div><div class="code-lang">bash · pipe, redirect, and text tools</div></div>
+      <pre><span class="cmt"># Pipe: send output of one command as input to another</span>
+<span class="cmd">kubectl</span> get pods | <span class="cmd">grep</span> Running
+<span class="cmd">docker</span> ps | <span class="cmd">grep</span> nginx | <span class="cmd">awk</span> <span class="str">'{print $1}'</span>
+
+<span class="cmt"># Redirect output to a file</span>
+<span class="cmd">kubectl</span> get all > cluster-state.txt   <span class="cmt"># overwrite</span>
+<span class="cmd">kubectl</span> logs pod/my-pod >> app.log    <span class="cmt"># append</span>
+
+<span class="cmt"># Discard output</span>
+<span class="cmd">command</span> 2>/dev/null   <span class="cmt"># discard stderr</span>
+<span class="cmd">command</span> &>/dev/null   <span class="cmt"># discard all output</span>
+
+<span class="cmt"># Useful one-liners</span>
+<span class="cmd">kubectl</span> get pods -o wide | <span class="cmd">awk</span> <span class="str">'{print $1, $7}'</span>  <span class="cmt"># pod name + node</span>
+<span class="cmd">cat</span> /etc/hosts | <span class="cmd">grep</span> <span class="flag">-v</span> <span class="str">"#"</span>                      <span class="cmt"># skip comment lines</span>
+<span class="cmd">ls</span> /etc | <span class="cmd">sort</span> | <span class="cmd">head</span> <span class="flag">-10</span>                       <span class="cmt"># first 10 sorted entries</span></pre>
+    </div>
+
+    <div class="callout tip">
+      <div class="callout-label">💡 Pro Tip</div>
+      <p>Learn <strong>tmux</strong> or <strong>screen</strong> for managing multiple terminal panes. When debugging Kubernetes, you'll often need one pane watching pods, another tailing logs, and a third running commands.</p>
+    </div>
+  </section>
+
+  <!-- ═══════════════════════════════ SECTION 2: DOCKER -->
+  <section id="docker">
+    <div class="section-num">// 02</div>
+    <h2>Docker & Containers</h2>
+    <p>Kubernetes orchestrates containers. Docker is the most common tool for building and running them. Before Kubernetes makes sense, containers must be completely natural to you.</p>
+
+    <h3>// Containers vs Virtual Machines</h3>
+
+    <div class="compare">
+      <div class="compare-col orange-border">
+        <div class="compare-col-title">Virtual Machine</div>
+        <div class="compare-item">Includes full OS (kernel + userland)</div>
+        <div class="compare-item">Gigabytes in size</div>
+        <div class="compare-item">Boots in 30–60 seconds</div>
+        <div class="compare-item">Strong hardware-level isolation</div>
+        <div class="compare-item">Managed by hypervisor (VMware, KVM)</div>
+      </div>
+      <div class="compare-col green-border">
+        <div class="compare-col-title">Container</div>
+        <div class="compare-item">Shares the host kernel, packages only app + deps</div>
+        <div class="compare-item">Megabytes in size</div>
+        <div class="compare-item">Starts in milliseconds</div>
+        <div class="compare-item">Process-level isolation via namespaces + cgroups</div>
+        <div class="compare-item">Managed by container runtime (containerd)</div>
+      </div>
+    </div>
+
+    <h3>// How Docker Works</h3>
+
+    <div class="diagram">
+      <div class="diagram-label">Docker Architecture</div>
+      <div class="d-row">
+        <div class="d-box orange">Dockerfile<br><small style="font-size:0.65rem">recipe</small></div>
+        <div class="d-arrow">→ build →</div>
+        <div class="d-box yellow">Image<br><small style="font-size:0.65rem">blueprint (read-only)</small></div>
+        <div class="d-arrow">→ push to →</div>
+        <div class="d-box blue">Registry<br><small style="font-size:0.65rem">Docker Hub / ECR / GCR</small></div>
+      </div>
+      <div class="d-row" style="margin-top:0.5rem">
+        <div class="d-box yellow">Image<br><small style="font-size:0.65rem">pulled from registry</small></div>
+        <div class="d-arrow">→ run →</div>
+        <div class="d-box green">Container<br><small style="font-size:0.65rem">running instance</small></div>
+        <div class="d-arrow">→ used by →</div>
+        <div class="d-box purple">Kubernetes<br><small style="font-size:0.65rem">orchestrates many containers</small></div>
+      </div>
+    </div>
+
+    <h3>// Writing a Dockerfile</h3>
+    <p>A Dockerfile is a recipe for building a container image. Each instruction creates a new read-only <strong>layer</strong> — understanding layers is key to building efficient images.</p>
+
+    <div class="code-block">
+      <div class="code-header"><div class="code-dots"><span></span><span></span><span></span></div><div class="code-lang">dockerfile · node.js app example</div></div>
+      <pre><span class="cmt"># Base image — use official, minimal images</span>
+<span class="hl">FROM</span> node:20-alpine
+
+<span class="cmt"># Set working directory inside the container</span>
+<span class="hl">WORKDIR</span> /app
+
+<span class="cmt"># Copy package files first (layer caching optimization!)</span>
+<span class="hl">COPY</span> package*.json ./
+
+<span class="cmt"># Install dependencies</span>
+<span class="hl">RUN</span> npm ci --only=production
+
+<span class="cmt"># Copy the rest of the app</span>
+<span class="hl">COPY</span> . .
+
+<span class="cmt"># Don't run as root inside containers</span>
+<span class="hl">RUN</span> addgroup -S appgroup && adduser -S appuser -G appgroup
+<span class="hl">USER</span> appuser
+
+<span class="cmt"># Document the port (doesn't actually expose it)</span>
+<span class="hl">EXPOSE</span> 3000
+
+<span class="cmt"># Default command to run the app</span>
+<span class="hl">CMD</span> ["node", "server.js"]</pre>
+    </div>
+
+    <div class="callout warn">
+      <div class="callout-label">⚠️ Layer Caching</div>
+      <p>Docker caches each layer. Put things that change <em>least often</em> at the top (base image, dependencies) and things that change <em>most often</em> at the bottom (source code). This dramatically speeds up rebuilds.</p>
+    </div>
+
+    <h3>// Essential Docker Commands</h3>
+
+    <div class="cheat-grid">
+      <div class="cheat-box orange-top">
+        <div class="cheat-box-title">Images</div>
+        <div class="cheat-row"><span class="cheat-cmd">docker build -t name:tag .</span><span class="cheat-desc">Build image from Dockerfile in current dir</span></div>
+        <div class="cheat-row"><span class="cheat-cmd">docker images</span><span class="cheat-desc">List all local images</span></div>
+        <div class="cheat-row"><span class="cheat-cmd">docker pull nginx:alpine</span><span class="cheat-desc">Pull image from registry</span></div>
+        <div class="cheat-row"><span class="cheat-cmd">docker push user/app:v1</span><span class="cheat-desc">Push image to registry</span></div>
+        <div class="cheat-row"><span class="cheat-cmd">docker rmi image:tag</span><span class="cheat-desc">Delete a local image</span></div>
+        <div class="cheat-row"><span class="cheat-cmd">docker history image</span><span class="cheat-desc">Show layers and their sizes</span></div>
+      </div>
+
+      <div class="cheat-box green-top">
+        <div class="cheat-box-title">Containers</div>
+        <div class="cheat-row"><span class="cheat-cmd">docker run -d -p 80:3000 app</span><span class="cheat-desc">Run detached, map port 80→3000</span></div>
+        <div class="cheat-row"><span class="cheat-cmd">docker run -it ubuntu bash</span><span class="cheat-desc">Interactive shell in container</span></div>
+        <div class="cheat-row"><span class="cheat-cmd">docker ps</span><span class="cheat-desc">List running containers</span></div>
+        <div class="cheat-row"><span class="cheat-cmd">docker ps -a</span><span class="cheat-desc">List all containers (including stopped)</span></div>
+        <div class="cheat-row"><span class="cheat-cmd">docker stop CONTAINER</span><span class="cheat-desc">Gracefully stop a container</span></div>
+        <div class="cheat-row"><span class="cheat-cmd">docker rm CONTAINER</span><span class="cheat-desc">Remove a stopped container</span></div>
+      </div>
+
+      <div class="cheat-box blue-top">
+        <div class="cheat-box-title">Debugging</div>
+        <div class="cheat-row"><span class="cheat-cmd">docker logs -f CONTAINER</span><span class="cheat-desc">Follow container logs</span></div>
+        <div class="cheat-row"><span class="cheat-cmd">docker exec -it C bash</span><span class="cheat-desc">Open shell in running container</span></div>
+        <div class="cheat-row"><span class="cheat-cmd">docker inspect CONTAINER</span><span class="cheat-desc">Full JSON config and state</span></div>
+        <div class="cheat-row"><span class="cheat-cmd">docker stats</span><span class="cheat-desc">Live CPU/memory usage</span></div>
+        <div class="cheat-row"><span class="cheat-cmd">docker top CONTAINER</span><span class="cheat-desc">Processes running inside</span></div>
+        <div class="cheat-row"><span class="cheat-cmd">docker diff CONTAINER</span><span class="cheat-desc">Show filesystem changes</span></div>
+      </div>
+
+      <div class="cheat-box yellow-top">
+        <div class="cheat-box-title">Volumes & Networks</div>
+        <div class="cheat-row"><span class="cheat-cmd">docker run -v /host:/container</span><span class="cheat-desc">Bind mount host directory</span></div>
+        <div class="cheat-row"><span class="cheat-cmd">docker volume create myvol</span><span class="cheat-desc">Create named volume</span></div>
+        <div class="cheat-row"><span class="cheat-cmd">docker run -v myvol:/data app</span><span class="cheat-desc">Mount named volume</span></div>
+        <div class="cheat-row"><span class="cheat-cmd">docker network create mynet</span><span class="cheat-desc">Create a bridge network</span></div>
+        <div class="cheat-row"><span class="cheat-cmd">docker run --network mynet app</span><span class="cheat-desc">Attach container to network</span></div>
+        <div class="cheat-row"><span class="cheat-cmd">docker network ls</span><span class="cheat-desc">List networks</span></div>
+      </div>
+    </div>
+
+    <h3>// Docker Compose</h3>
+    <p>Docker Compose runs multi-container apps locally. Think of it as a mini-Kubernetes for your laptop. Understanding Compose helps you grasp K8s concepts like Services and Deployments.</p>
+
+    <div class="code-block">
+      <div class="code-header"><div class="code-dots"><span></span><span></span><span></span></div><div class="code-lang">yaml · docker-compose.yml</div></div>
+      <pre><span class="yaml-key">version</span>: <span class="yaml-val">'3.9'</span>
+<span class="yaml-key">services</span>:
+  <span class="yaml-key">web</span>:
+    <span class="yaml-key">build</span>: <span class="yaml-val">.</span>                <span class="yaml-cmt"># build from Dockerfile</span>
+    <span class="yaml-key">ports</span>: [<span class="yaml-val">"3000:3000"</span>]
+    <span class="yaml-key">environment</span>:
+      <span class="yaml-key">DB_HOST</span>: <span class="yaml-val">postgres</span>    <span class="yaml-cmt"># service name = hostname in Docker network</span>
+      <span class="yaml-key">DB_PORT</span>: <span class="yaml-val">"5432"</span>
+    <span class="yaml-key">depends_on</span>: [<span class="yaml-val">postgres</span>]
+
+  <span class="yaml-key">postgres</span>:
+    <span class="yaml-key">image</span>: <span class="yaml-val">postgres:15-alpine</span>
+    <span class="yaml-key">environment</span>:
+      <span class="yaml-key">POSTGRES_PASSWORD</span>: <span class="yaml-val">secret</span>
+    <span class="yaml-key">volumes</span>:
+      - <span class="yaml-val">pgdata:/var/lib/postgresql/data</span>
+
+<span class="yaml-key">volumes</span>:
+  <span class="yaml-key">pgdata</span>:   <span class="yaml-cmt"># named volume (persists between container restarts)</span></pre>
+    </div>
+
+    <div class="code-block">
+      <div class="code-header"><div class="code-dots"><span></span><span></span><span></span></div><div class="code-lang">bash · docker compose commands</div></div>
+      <pre><span class="cmd">docker compose up -d</span>      <span class="cmt"># start all services in background</span>
+<span class="cmd">docker compose down</span>        <span class="cmt"># stop and remove containers</span>
+<span class="cmd">docker compose down -v</span>     <span class="cmt"># also delete volumes</span>
+<span class="cmd">docker compose logs -f web</span> <span class="cmt"># follow logs for 'web' service</span>
+<span class="cmd">docker compose ps</span>          <span class="cmt"># list running services</span>
+<span class="cmd">docker compose exec web sh</span> <span class="cmt"># shell into 'web' container</span></pre>
+    </div>
+
+    <div class="callout orange">
+      <div class="callout-label">🔗 Compose → Kubernetes</div>
+      <p>When you move from Docker Compose to Kubernetes: <strong>services</strong> become K8s Services, <strong>image + ports</strong> become Pod specs in Deployments, <strong>volumes</strong> become PersistentVolumeClaims, and <strong>environment</strong> becomes ConfigMaps and Secrets.</p>
+    </div>
+  </section>
+
+  <!-- ═══════════════════════════════ SECTION 3: NETWORKING -->
+  <section id="networking">
+    <div class="section-num">// 03</div>
+    <h2>Networking Fundamentals</h2>
+    <p>Kubernetes networking is complex. Before tackling Services, Ingress, and NetworkPolicies, you need solid grounding in the basics that underpin all of it.</p>
+
+    <h3>// IP Addresses & Subnets</h3>
+    <p>Every machine (and container, and Pod) has an IP address. A subnet is a range of IPs in the same network. CIDR notation describes these ranges.</p>
+
+    <div class="code-block">
+      <div class="code-header"><div class="code-dots"><span></span><span></span><span></span></div><div class="code-lang">bash · IP and network basics</div></div>
+      <pre><span class="cmt"># CIDR notation: IP/prefix-length</span>
+<span class="out">192.168.1.0/24  → 256 addresses (192.168.1.0 – 192.168.1.255)
+10.0.0.0/16     → 65536 addresses (common for K8s pod CIDR)
+172.16.0.0/12   → 1M+ addresses
+
+# K8s commonly uses:
+# Pod CIDR:     10.244.0.0/16 (Flannel) or 192.168.0.0/16 (Calico)
+# Service CIDR: 10.96.0.0/12</span>
+
+<span class="cmt"># View your machine's IP addresses</span>
+<span class="cmd">ip addr show</span>
+<span class="cmd">ifconfig</span>       <span class="cmt"># older systems</span>
+
+<span class="cmt"># View routing table</span>
+<span class="cmd">ip route show</span>
+<span class="cmd">route -n</span></pre>
+    </div>
+
+    <h3>// TCP/IP & Ports</h3>
+    <p>Network communication happens between IP:Port pairs. Kubernetes Services expose applications on specific ports — understanding why matters.</p>
+
+    <div class="diagram">
+      <div class="diagram-label">TCP Connection Flow</div>
+      <div class="d-row">
+        <div class="d-box orange">Client<br><small style="font-size:0.65rem">192.168.1.10:54321</small></div>
+        <div class="d-arrow">→ SYN →</div>
+        <div class="d-box green">Server<br><small style="font-size:0.65rem">10.0.0.5:80</small></div>
+      </div>
+      <div style="font-size:0.7rem;color:var(--muted);margin:0.5rem 0 1rem 0">TCP handshake: SYN → SYN-ACK → ACK → connection established</div>
+      <div class="d-row">
+        <div class="d-box blue">Well-known ports</div>
+        <div class="d-box yellow">Registered ports</div>
+        <div class="d-box purple">Ephemeral ports</div>
+      </div>
+      <div style="font-size:0.7rem;color:var(--muted);margin-top:0.5rem">
+        0–1023 (HTTP:80, HTTPS:443, SSH:22) &nbsp;|&nbsp; 1024–49151 &nbsp;|&nbsp; 49152–65535 (clients use these)
+      </div>
+    </div>
+
+    <table class="data-table">
+      <thead><tr><th>Port</th><th>Protocol</th><th>Relevant To K8s?</th></tr></thead>
+      <tbody>
+        <tr><td><code>22</code></td><td>SSH</td><td>Node access, GitOps</td></tr>
+        <tr><td><code>80 / 443</code></td><td>HTTP / HTTPS</td><td>Ingress, external traffic</td></tr>
+        <tr><td><code>2379–2380</code></td><td>etcd</td><td>Control plane data store</td></tr>
+        <tr><td><code>6443</code></td><td>Kubernetes API Server</td><td>kubectl connects here</td></tr>
+        <tr><td><code>10250</code></td><td>Kubelet API</td><td>Control plane → node communication</td></tr>
+        <tr><td><code>30000–32767</code></td><td>NodePort Services</td><td>External access to services (dev)</td></tr>
+      </tbody>
+    </table>
+
+    <h3>// DNS — Domain Name System</h3>
+    <p>DNS translates names like <code>my-service.default.svc.cluster.local</code> into IP addresses. Kubernetes runs its own DNS server (CoreDNS) that makes service discovery work automatically.</p>
+
+    <div class="code-block">
+      <div class="code-header"><div class="code-dots"><span></span><span></span><span></span></div><div class="code-lang">bash · DNS debugging tools</div></div>
+      <pre><span class="cmt"># Resolve a hostname</span>
+<span class="cmd">nslookup</span> google.com
+<span class="cmd">dig</span> google.com
+<span class="cmd">host</span> google.com
+
+<span class="cmt"># Trace the full DNS resolution path</span>
+<span class="cmd">dig</span> +trace kubernetes.io
+
+<span class="cmt"># Check what DNS server you're using</span>
+<span class="cmd">cat</span> /etc/resolv.conf
+<span class="out">nameserver 10.96.0.10    ← this is CoreDNS inside a K8s Pod!
+search default.svc.cluster.local svc.cluster.local cluster.local</span>
+
+<span class="cmt"># Test DNS from inside a K8s pod</span>
+<span class="cmd">kubectl</span> run debug --image=busybox --rm -it -- nslookup kubernetes.default</pre>
+    </div>
+
+    <h3>// Load Balancing</h3>
+    <p>A load balancer distributes traffic across multiple servers. Kubernetes Services do this automatically, but understanding the concept helps you configure them correctly.</p>
+
+    <div class="diagram">
+      <div class="diagram-label">Load Balancer Distribution</div>
+      <div class="d-row">
+        <div class="d-box orange">Client Requests<br><small style="font-size:0.65rem">100 req/s</small></div>
+        <div class="d-arrow">→</div>
+        <div class="d-box blue">Load Balancer<br><small style="font-size:0.65rem">K8s Service (kube-proxy)</small></div>
+        <div class="d-arrow">→</div>
+        <div style="display:flex;flex-direction:column;gap:0.5rem">
+          <div class="d-box green">Pod 1<br><small style="font-size:0.65rem">~33 req/s</small></div>
+          <div class="d-box green">Pod 2<br><small style="font-size:0.65rem">~33 req/s</small></div>
+          <div class="d-box green">Pod 3<br><small style="font-size:0.65rem">~33 req/s</small></div>
+        </div>
+      </div>
+    </div>
+
+    <h3>// Networking Debugging Toolkit</h3>
+
+    <div class="code-block">
+      <div class="code-header"><div class="code-dots"><span></span><span></span><span></span></div><div class="code-lang">bash · essential network commands</div></div>
+      <pre><span class="cmt"># Test connectivity</span>
+<span class="cmd">ping</span> 8.8.8.8                <span class="cmt"># is this host reachable?</span>
+<span class="cmd">curl</span> <span class="flag">-I</span> https://google.com  <span class="cmt"># HTTP response headers</span>
+<span class="cmd">wget</span> <span class="flag">-q -O -</span> http://service  <span class="cmt"># fetch URL silently</span>
+
+<span class="cmt"># Trace route to destination</span>
+<span class="cmd">traceroute</span> 8.8.8.8
+<span class="cmd">mtr</span> 8.8.8.8         <span class="cmt"># better interactive version</span>
+
+<span class="cmt"># Check open ports on this machine</span>
+<span class="cmd">ss -tlnp</span>            <span class="cmt"># preferred over netstat</span>
+<span class="cmd">netstat -tlnp</span>       <span class="cmt"># older systems</span>
+
+<span class="cmt"># Test if a port is open on a remote host</span>
+<span class="cmd">nc -zv</span> 10.0.0.5 80  <span class="cmt"># netcat: is port 80 open?</span>
+<span class="cmd">telnet</span> 10.0.0.5 5432
+
+<span class="cmt"># Inspect network interfaces</span>
+<span class="cmd">ip link show</span>
+<span class="cmd">ip addr show eth0</span>
+
+<span class="cmt"># View iptables rules (what K8s kube-proxy manages)</span>
+<span class="cmd">iptables -L -n -v</span></pre>
+    </div>
+
+    <div class="callout tip">
+      <div class="callout-label">💡 K8s Networking Rules</div>
+      <p>Kubernetes enforces 3 rules: <strong>Pod-to-Pod</strong> communication needs no NAT. <strong>Node-to-Pod</strong> communication needs no NAT. The IP a Pod sees itself as is the same IP others use to reach it. Everything is flat — no masquerading.</p>
+    </div>
+  </section>
+
+  <!-- ═══════════════════════════════ SECTION 4: YAML -->
+  <section id="yaml">
+    <div class="section-num">// 04</div>
+    <h2>YAML</h2>
+    <p>Every Kubernetes resource is defined in YAML. A single indentation error can break a deployment. You must be comfortable reading and writing YAML before touching <code>kubectl apply</code>.</p>
+
+    <h3>// YAML vs JSON</h3>
+    <p>YAML is a superset of JSON — valid JSON is also valid YAML. YAML uses indentation instead of braces and is designed for human readability. Kubernetes accepts both, but YAML is standard.</p>
+
+    <div class="compare">
+      <div class="compare-col orange-border">
+        <div class="compare-col-title">JSON</div>
+        <div style="font-family:'JetBrains Mono',monospace;font-size:0.75rem;color:#94a3b8;line-height:1.8">
+          {<br>
+          &nbsp;&nbsp;"name": "nginx",<br>
+          &nbsp;&nbsp;"version": "1.25",<br>
+          &nbsp;&nbsp;"replicas": 3,<br>
+          &nbsp;&nbsp;"enabled": true,<br>
+          &nbsp;&nbsp;"ports": [80, 443],<br>
+          &nbsp;&nbsp;"labels": {<br>
+          &nbsp;&nbsp;&nbsp;&nbsp;"app": "web",<br>
+          &nbsp;&nbsp;&nbsp;&nbsp;"env": "prod"<br>
+          &nbsp;&nbsp;}<br>
+          }
+        </div>
+      </div>
+      <div class="compare-col green-border">
+        <div class="compare-col-title">YAML (equivalent)</div>
+        <div style="font-family:'JetBrains Mono',monospace;font-size:0.75rem;color:#94a3b8;line-height:1.8">
+          <span style="color:#00d4ff">name</span>: <span style="color:#34d399">nginx</span><br>
+          <span style="color:#00d4ff">version</span>: <span style="color:#34d399">"1.25"</span><br>
+          <span style="color:#00d4ff">replicas</span>: <span style="color:#f59e0b">3</span><br>
+          <span style="color:#00d4ff">enabled</span>: <span style="color:#a78bfa">true</span><br>
+          <span style="color:#00d4ff">ports</span>: [<span style="color:#f59e0b">80</span>, <span style="color:#f59e0b">443</span>]<br>
+          <span style="color:#00d4ff">labels</span>:<br>
+          &nbsp;&nbsp;<span style="color:#00d4ff">app</span>: <span style="color:#34d399">web</span><br>
+          &nbsp;&nbsp;<span style="color:#00d4ff">env</span>: <span style="color:#34d399">prod</span><br>
+        </div>
+      </div>
+    </div>
+
+    <h3>// YAML Syntax Rules</h3>
+
+    <div class="code-block">
+      <div class="code-header"><div class="code-dots"><span></span><span></span><span></span></div><div class="code-lang">yaml · complete syntax reference</div></div>
+      <pre><span class="yaml-cmt"># 1. Comments start with #</span>
+<span class="yaml-cmt"># 2. ALWAYS use spaces — NEVER tabs</span>
+<span class="yaml-cmt"># 3. Indentation defines structure (2 spaces per level is standard)</span>
+
+<span class="yaml-cmt">---   # document separator (optional but good practice)</span>
+
+<span class="yaml-cmt"># Scalars (strings, numbers, booleans)</span>
+<span class="yaml-key">name</span>: <span class="yaml-val">my-app</span>             <span class="yaml-cmt"># bare string</span>
+<span class="yaml-key">version</span>: <span class="yaml-val">"1.0.0"</span>         <span class="yaml-cmt"># quoted string (use when has special chars)</span>
+<span class="yaml-key">replicas</span>: <span class="yaml-num">3</span>              <span class="yaml-cmt"># integer</span>
+<span class="yaml-key">cpu_limit</span>: <span class="yaml-num">0.5</span>           <span class="yaml-cmt"># float</span>
+<span class="yaml-key">enabled</span>: <span class="yaml-bool">true</span>            <span class="yaml-cmt"># boolean (true/false, yes/no, on/off)</span>
+<span class="yaml-key">nothing</span>: <span class="yaml-bool">null</span>            <span class="yaml-cmt"># null value (~  also works)</span>
+
+<span class="yaml-cmt"># Nested mapping (object)</span>
+<span class="yaml-key">resources</span>:
+  <span class="yaml-key">requests</span>:
+    <span class="yaml-key">cpu</span>: <span class="yaml-val">"250m"</span>
+    <span class="yaml-key">memory</span>: <span class="yaml-val">"256Mi"</span>
+
+<span class="yaml-cmt"># Sequence (list) — block style</span>
+<span class="yaml-key">ports</span>:
+  - <span class="yaml-num">80</span>
+  - <span class="yaml-num">443</span>
+  - <span class="yaml-num">8080</span>
+
+<span class="yaml-cmt"># Sequence — flow style (inline)</span>
+<span class="yaml-key">ports</span>: [<span class="yaml-num">80</span>, <span class="yaml-num">443</span>, <span class="yaml-num">8080</span>]
+
+<span class="yaml-cmt"># List of objects</span>
+<span class="yaml-key">containers</span>:
+  - <span class="yaml-key">name</span>: <span class="yaml-val">web</span>
+    <span class="yaml-key">image</span>: <span class="yaml-val">nginx:1.25</span>
+    <span class="yaml-key">ports</span>:
+      - <span class="yaml-key">containerPort</span>: <span class="yaml-num">80</span>
+  - <span class="yaml-key">name</span>: <span class="yaml-val">sidecar</span>
+    <span class="yaml-key">image</span>: <span class="yaml-val">fluentd:latest</span>
+
+<span class="yaml-cmt"># Multiline strings</span>
+<span class="yaml-key">config_file</span>: |          <span class="yaml-cmt"># | preserves newlines (literal block)</span>
+  server {
+    listen 80;
+    location / { proxy_pass http://backend; }
+  }
+
+<span class="yaml-key">description</span>: >          <span class="yaml-cmt"># > folds newlines into spaces (folded block)</span>
+  This is a very long
+  description that will
+  become one line.</pre>
+    </div>
+
+    <h3>// Common YAML Gotchas</h3>
+
+    <div class="code-block">
+      <div class="code-header"><div class="code-dots"><span></span><span></span><span></span></div><div class="code-lang">yaml · pitfalls to avoid</div></div>
+      <pre><span class="yaml-cmt"># ❌ WRONG: using tabs</span>
+<span class="err">name: app
+	image: nginx   ← TAB here causes parse error!</span>
+
+<span class="yaml-cmt"># ✅ RIGHT: use spaces</span>
+<span class="yaml-key">name</span>: <span class="yaml-val">app</span>
+  <span class="yaml-key">image</span>: <span class="yaml-val">nginx</span>
+
+<span class="yaml-cmt"># ❌ WRONG: inconsistent indentation</span>
+<span class="err">spec:
+  containers:
+  - name: app
+      image: nginx   ← wrong indent level!</span>
+
+<span class="yaml-cmt"># ❌ Strings that look like other types need quoting</span>
+<span class="err">version: 1.10    ← parsed as float 1.1, not string "1.10"!</span>
+<span class="yaml-key">version</span>: <span class="yaml-val">"1.10"</span>  <span class="yaml-cmt"># ✅ correct</span>
+
+<span class="err">value: yes       ← parsed as boolean true, not string "yes"!</span>
+<span class="yaml-key">value</span>: <span class="yaml-val">"yes"</span>    <span class="yaml-cmt"># ✅ correct</span>
+
+<span class="yaml-cmt"># Validate YAML before applying</span>
+<span class="cmd">kubectl</span> apply <span class="flag">--dry-run=client -f</span> deployment.yaml
+<span class="cmd">python3</span> <span class="flag">-c</span> <span class="str">"import yaml,sys; yaml.safe_load(open('file.yaml'))"</span></pre>
+    </div>
+
+    <h3>// YAML Anchors & Aliases (DRY YAML)</h3>
+    <p>YAML supports anchors (<code>&amp;</code>) and aliases (<code>*</code>) to reuse content and avoid repetition — useful in CI/CD configs.</p>
+
+    <div class="code-block">
+      <div class="code-header"><div class="code-dots"><span></span><span></span><span></span></div><div class="code-lang">yaml · anchors & aliases</div></div>
+      <pre><span class="yaml-cmt"># Define an anchor with &amp;</span>
+<span class="yaml-key">defaults</span>: <span class="hl">&amp;defaults</span>
+  <span class="yaml-key">restartPolicy</span>: <span class="yaml-val">Always</span>
+  <span class="yaml-key">imagePullPolicy</span>: <span class="yaml-val">IfNotPresent</span>
+
+<span class="yaml-cmt"># Reuse it with * (alias) and << (merge)</span>
+<span class="yaml-key">production</span>:
+  <span class="hl">&lt;&lt;: *defaults</span>       <span class="yaml-cmt"># merges all keys from defaults</span>
+  <span class="yaml-key">replicas</span>: <span class="yaml-num">5</span>
+
+<span class="yaml-key">staging</span>:
+  <span class="hl">&lt;&lt;: *defaults</span>
+  <span class="yaml-key">replicas</span>: <span class="yaml-num">1</span></pre>
+    </div>
+
+    <div class="callout info">
+      <div class="callout-label">🛠️ Helpful Tools</div>
+      <p>Use <strong>yamllint</strong> to catch syntax errors. The <strong>YAML Language Server</strong> extension for VS Code gives real-time validation and Kubernetes schema completions. Install it — it will save you hours of debugging.</p>
+    </div>
+  </section>
+
+  <!-- ═══════════════════════════════ SECTION 5: CLI -->
+  <section id="cli">
+    <div class="section-num">// 05</div>
+    <h2>CLI Productivity</h2>
+    <p>You'll spend a huge amount of time in the terminal. Mastering shell productivity now means less friction when you're deep in Kubernetes debugging.</p>
+
+    <h3>// Shell Shortcuts</h3>
+
+    <div class="cheat-grid">
+      <div class="cheat-box orange-top">
+        <div class="cheat-box-title">Cursor Movement</div>
+        <div class="cheat-row"><span class="cheat-cmd">Ctrl + A</span><span class="cheat-desc">Jump to beginning of line</span></div>
+        <div class="cheat-row"><span class="cheat-cmd">Ctrl + E</span><span class="cheat-desc">Jump to end of line</span></div>
+        <div class="cheat-row"><span class="cheat-cmd">Ctrl + ←/→</span><span class="cheat-desc">Jump word by word</span></div>
+        <div class="cheat-row"><span class="cheat-cmd">Ctrl + U</span><span class="cheat-desc">Delete to beginning of line</span></div>
+        <div class="cheat-row"><span class="cheat-cmd">Ctrl + K</span><span class="cheat-desc">Delete to end of line</span></div>
+        <div class="cheat-row"><span class="cheat-cmd">Ctrl + W</span><span class="cheat-desc">Delete previous word</span></div>
+      </div>
+
+      <div class="cheat-box green-top">
+        <div class="cheat-box-title">History & Search</div>
+        <div class="cheat-row"><span class="cheat-cmd">↑ / ↓</span><span class="cheat-desc">Browse command history</span></div>
+        <div class="cheat-row"><span class="cheat-cmd">Ctrl + R</span><span class="cheat-desc">Reverse search through history</span></div>
+        <div class="cheat-row"><span class="cheat-cmd">!!</span><span class="cheat-desc">Repeat last command</span></div>
+        <div class="cheat-row"><span class="cheat-cmd">!kubectl</span><span class="cheat-desc">Repeat last command starting with kubectl</span></div>
+        <div class="cheat-row"><span class="cheat-cmd">history | grep</span><span class="cheat-desc">Search command history</span></div>
+        <div class="cheat-row"><span class="cheat-cmd">Ctrl + L</span><span class="cheat-desc">Clear the screen</span></div>
+      </div>
+    </div>
+
+    <h3>// Shell Configuration</h3>
+
+    <div class="code-block">
+      <div class="code-header"><div class="code-dots"><span></span><span></span><span></span></div><div class="code-lang">bash · ~/.bashrc or ~/.zshrc — K8s productivity setup</div></div>
+      <pre><span class="cmt"># ── Kubernetes aliases ──────────────────────────────────</span>
+<span class="cmd">alias</span> k=<span class="str">'kubectl'</span>
+<span class="cmd">alias</span> kg=<span class="str">'kubectl get'</span>
+<span class="cmd">alias</span> kd=<span class="str">'kubectl describe'</span>
+<span class="cmd">alias</span> kl=<span class="str">'kubectl logs'</span>
+<span class="cmd">alias</span> kx=<span class="str">'kubectl exec -it'</span>
+<span class="cmd">alias</span> kap=<span class="str">'kubectl apply -f'</span>
+
+<span class="cmt"># ── kubectl autocompletion ───────────────────────────────</span>
+<span class="cmd">source</span> &lt;(kubectl completion bash)
+<span class="cmd">complete</span> <span class="flag">-F</span> __start_kubectl k  <span class="cmt"># also autocomplete 'k' alias</span>
+
+<span class="cmt"># ── Docker aliases ───────────────────────────────────────</span>
+<span class="cmd">alias</span> dc=<span class="str">'docker compose'</span>
+<span class="cmd">alias</span> dps=<span class="str">'docker ps --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}"'</span>
+<span class="cmd">alias</span> dclean=<span class="str">'docker system prune -af'</span>
+
+<span class="cmt"># ── General productivity ─────────────────────────────────</span>
+<span class="cmd">alias</span> ll=<span class="str">'ls -lahF --color=auto'</span>
+<span class="cmd">alias</span> grep=<span class="str">'grep --color=auto'</span>
+
+<span class="cmt"># Show current K8s context in shell prompt</span>
+<span class="cmd">PS1</span>=<span class="str">'$(kubectl config current-context 2>/dev/null) $ '</span></pre>
+    </div>
+
+    <h3>// Text Editors in Terminal</h3>
+    <p>You'll need to edit YAML files, configs, and scripts in the terminal. At minimum, know enough <strong>vim</strong> to not get stuck.</p>
+
+    <div class="code-block">
+      <div class="code-header"><div class="code-dots"><span></span><span></span><span></span></div><div class="code-lang">bash · vim survival guide</div></div>
+      <pre><span class="cmt"># Open a file</span>
+<span class="cmd">vim</span> deployment.yaml
+
+<span class="cmt"># Modes (this is where people get stuck!)</span>
+<span class="out">Normal mode  → default, for navigation and commands
+Insert mode  → press 'i' to enter, type text, press Esc to exit
+Visual mode  → press 'v' to select text</span>
+
+<span class="cmt"># Essential commands (in Normal mode)</span>
+<span class="out">i          → enter Insert mode
+Esc        → return to Normal mode
+:w         → save file
+:q         → quit (fails if unsaved changes)
+:wq        → save and quit
+:q!        → quit WITHOUT saving (force quit)
+/text      → search forward for "text"
+n / N      → next / previous search result
+dd         → delete current line
+yy         → copy (yank) current line
+p          → paste after cursor
+u          → undo
+Ctrl+r     → redo
+gg         → go to first line
+G          → go to last line
+:set nu    → show line numbers</span>
+
+<span class="cmt"># If you prefer nano (simpler):</span>
+<span class="cmd">nano</span> deployment.yaml
+<span class="out">Ctrl+O → save | Ctrl+X → exit | Ctrl+W → search</span></pre>
+    </div>
+
+    <h3>// Essential Tools to Install</h3>
+
+    <div class="card-grid">
+      <div class="card">
+        <div class="card-icon">🔍</div>
+        <div class="card-name">fzf</div>
+        <div class="card-desc">Fuzzy finder for command history, files, and kubectl output. Press Ctrl+R for supercharged history search.</div>
+        <div style="margin-top:0.75rem"><span class="tag green">brew install fzf</span></div>
+      </div>
+      <div class="card">
+        <div class="card-icon">📋</div>
+        <div class="card-name">jq</div>
+        <div class="card-desc">Parse and filter JSON from the command line. Essential for processing <code>kubectl -o json</code> output.</div>
+        <div style="margin-top:0.75rem"><span class="tag green">brew install jq</span></div>
+      </div>
+      <div class="card">
+        <div class="card-icon">🔁</div>
+        <div class="card-name">tmux</div>
+        <div class="card-desc">Terminal multiplexer. Split your terminal into panes — one watching pods, one tailing logs, one running commands.</div>
+        <div style="margin-top:0.75rem"><span class="tag green">brew install tmux</span></div>
+      </div>
+      <div class="card">
+        <div class="card-icon">📊</div>
+        <div class="card-name">htop</div>
+        <div class="card-desc">Better <code>top</code>. Interactive process monitor with color, sorting, and tree view of processes.</div>
+        <div style="margin-top:0.75rem"><span class="tag green">brew install htop</span></div>
+      </div>
+      <div class="card">
+        <div class="card-icon">🔗</div>
+        <div class="card-name">httpie</div>
+        <div class="card-desc">Human-friendly HTTP client. Easier than curl for testing APIs. Syntax highlighting and JSON formatting.</div>
+        <div style="margin-top:0.75rem"><span class="tag green">brew install httpie</span></div>
+      </div>
+      <div class="card">
+        <div class="card-icon">✅</div>
+        <div class="card-name">yamllint</div>
+        <div class="card-desc">Validates YAML syntax and style. Run it before every <code>kubectl apply</code> to catch errors early.</div>
+        <div style="margin-top:0.75rem"><span class="tag orange">pip install yamllint</span></div>
+      </div>
+    </div>
+
+    <h3>// Shell Scripting Basics</h3>
+    <p>You'll write scripts to automate kubectl commands, set up environments, and run batch operations. These fundamentals are enough to get started.</p>
+
+    <div class="code-block">
+      <div class="code-header"><div class="code-dots"><span></span><span></span><span></span></div><div class="code-lang">bash · shell scripting essentials</div></div>
+      <pre><span class="hl">#!/bin/bash</span>              <span class="cmt"># shebang line — always first</span>
+<span class="cmd">set -euo pipefail</span>       <span class="cmt"># exit on error, undefined vars, pipe failures</span>
+
+<span class="cmt"># Variables</span>
+<span class="wht">NAMESPACE</span>=<span class="str">"production"</span>
+<span class="wht">APP</span>=<span class="str">"my-app"</span>
+<span class="wht">REPLICAS</span>=<span class="num">5</span>
+
+<span class="cmt"># String interpolation</span>
+<span class="cmd">echo</span> <span class="str">"Scaling $APP to $REPLICAS replicas in $NAMESPACE"</span>
+
+<span class="cmt"># Conditionals</span>
+<span class="hl">if</span> kubectl get namespace <span class="str">"$NAMESPACE"</span> &>/dev/null; <span class="hl">then</span>
+  <span class="cmd">echo</span> <span class="str">"Namespace exists"</span>
+<span class="hl">else</span>
+  kubectl create namespace <span class="str">"$NAMESPACE"</span>
+<span class="hl">fi</span>
+
+<span class="cmt"># Loops</span>
+<span class="hl">for</span> pod <span class="hl">in</span> $(kubectl get pods <span class="flag">-n</span> <span class="str">"$NAMESPACE"</span> <span class="flag">-o name</span>); <span class="hl">do</span>
+  <span class="cmd">echo</span> <span class="str">"Checking: $pod"</span>
+  kubectl logs <span class="str">"$pod"</span> <span class="flag">-n</span> <span class="str">"$NAMESPACE"</span> <span class="flag">--tail=5</span>
+<span class="hl">done</span>
+
+<span class="cmt"># Capture command output</span>
+<span class="wht">CURRENT_CONTEXT</span>=$(kubectl config current-context)
+<span class="cmd">echo</span> <span class="str">"Operating on cluster: $CURRENT_CONTEXT"</span>
+
+<span class="cmt"># Functions</span>
+<span class="hl">wait_for_rollout</span>() {
+  local deployment=<span class="str">$1</span>
+  local namespace=<span class="str">${2:-default}</span>
+  <span class="cmd">echo</span> <span class="str">"Waiting for $deployment..."</span>
+  kubectl rollout status deploy/<span class="str">"$deployment"</span> <span class="flag">-n</span> <span class="str">"$namespace"</span>
+}
+
+wait_for_rollout <span class="str">"my-app"</span> <span class="str">"production"</span></pre>
+    </div>
+  </section>
+
+  <!-- ═══════════════════════════════ SECTION 6: HANDS-ON -->
+  <section id="hands-on">
+    <div class="section-num">// 06</div>
+    <h2>Hands-On Lab</h2>
+    <p>Lock in everything from Stage 1 with these practical exercises. Do all of them before moving to Stage 2.</p>
+
+    <div class="steps">
+
+      <div class="step">
+        <div class="step-num">1</div>
+        <div class="step-content">
+          <h4>Linux Exploration</h4>
+          <p>Navigate the filesystem and practice file operations.</p>
+          <div class="code-block" style="margin-top:0.75rem">
+            <div class="code-header"><div class="code-dots"><span></span><span></span><span></span></div><div class="code-lang">bash</div></div>
+            <pre><span class="cmt"># Explore key directories</span>
+<span class="cmd">ls</span> /etc | <span class="cmd">head</span> -20
+<span class="cmd">ls</span> /proc | <span class="cmd">head</span> -20       <span class="cmt"># running processes</span>
+<span class="cmd">cat</span> /proc/cpuinfo          <span class="cmt"># CPU details</span>
+<span class="cmd">cat</span> /etc/os-release        <span class="cmt"># OS info</span>
+
+<span class="cmt"># Practice permissions</span>
+<span class="cmd">mkdir</span> ~/k8s-lab
+<span class="cmd">echo</span> <span class="str">"hello k8s"</span> > ~/k8s-lab/test.txt
+<span class="cmd">chmod</span> 644 ~/k8s-lab/test.txt
+<span class="cmd">ls -la</span> ~/k8s-lab/
+
+<span class="cmt"># Find all YAML files in a directory</span>
+<span class="cmd">find</span> ~ <span class="flag">-name</span> <span class="str">"*.yaml"</span> 2>/dev/null</pre>
+          </div>
+        </div>
+      </div>
+
+      <div class="step">
+        <div class="step-num">2</div>
+        <div class="step-content">
+          <h4>Build & Run a Docker Container</h4>
+          <p>Write a Dockerfile, build an image, and run it locally.</p>
+          <div class="code-block" style="margin-top:0.75rem">
+            <div class="code-header"><div class="code-dots"><span></span><span></span><span></span></div><div class="code-lang">bash</div></div>
+            <pre><span class="cmt"># Create a simple app</span>
+<span class="cmd">mkdir</span> ~/docker-lab && <span class="cmd">cd</span> ~/docker-lab
+<span class="cmd">echo</span> <span class="str">'&lt;h1&gt;Hello from Docker!&lt;/h1&gt;'</span> > index.html
+
+<span class="cmt"># Write a Dockerfile</span>
+<span class="cmd">cat</span> &gt; Dockerfile &lt;&lt;<span class="str">'EOF'
+FROM nginx:alpine
+COPY index.html /usr/share/nginx/html/
+EXPOSE 80
+EOF</span>
+
+<span class="cmt"># Build and run</span>
+<span class="cmd">docker build -t</span> my-nginx:v1 .
+<span class="cmd">docker run -d -p 8080:80 --name</span> test-nginx my-nginx:v1
+
+<span class="cmt"># Test it</span>
+<span class="cmd">curl</span> http://localhost:8080
+<span class="out">&lt;h1&gt;Hello from Docker!&lt;/h1&gt;</span>
+
+<span class="cmt"># Explore the running container</span>
+<span class="cmd">docker exec -it</span> test-nginx sh
+<span class="cmd">docker logs</span> test-nginx
+<span class="cmd">docker stats</span> test-nginx</pre>
+          </div>
+        </div>
+      </div>
+
+      <div class="step">
+        <div class="step-num">3</div>
+        <div class="step-content">
+          <h4>Docker Compose Multi-Service App</h4>
+          <p>Run a web server + database together with Compose.</p>
+          <div class="code-block" style="margin-top:0.75rem">
+            <div class="code-header"><div class="code-dots"><span></span><span></span><span></span></div><div class="code-lang">bash</div></div>
+            <pre><span class="cmd">mkdir</span> ~/compose-lab && <span class="cmd">cd</span> ~/compose-lab
+
+<span class="cmd">cat</span> &gt; docker-compose.yml &lt;&lt;<span class="str">'EOF'
+version: "3.9"
+services:
+  app:
+    image: nginx:alpine
+    ports: ["8081:80"]
+    depends_on: [db]
+    environment:
+      DB_HOST: db
+  db:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_PASSWORD: secret
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+volumes:
+  pgdata:
+EOF</span>
+
+<span class="cmd">docker compose up -d</span>
+<span class="cmd">docker compose ps</span>
+<span class="cmd">docker compose logs</span> db
+<span class="cmd">docker compose down -v</span>  <span class="cmt"># cleanup</span></pre>
+          </div>
+        </div>
+      </div>
+
+      <div class="step">
+        <div class="step-num">4</div>
+        <div class="step-content">
+          <h4>YAML Validation Practice</h4>
+          <p>Write and validate a Kubernetes-style YAML file.</p>
+          <div class="code-block" style="margin-top:0.75rem">
+            <div class="code-header"><div class="code-dots"><span></span><span></span><span></span></div><div class="code-lang">bash</div></div>
+            <pre><span class="cmt"># Install yamllint</span>
+<span class="cmd">pip install</span> yamllint <span class="flag">--break-system-packages</span>
+
+<span class="cmt"># Write a sample K8s YAML (intentionally with an error)</span>
+<span class="cmd">cat</span> &gt; test.yaml &lt;&lt;<span class="str">'EOF'
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: my-app
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: my-app
+  template:
+    metadata:
+      labels:
+        app: my-app
+    spec:
+      containers:
+      - name: web
+        image: nginx:1.25
+        ports:
+        - containerPort: 80
+EOF</span>
+
+<span class="cmt"># Validate it</span>
+<span class="cmd">yamllint</span> test.yaml
+<span class="out">test.yaml</span>
+<span class="out">  1:1       warning  missing document start "---"</span>
+
+<span class="cmt"># Parse it with Python to verify structure</span>
+<span class="cmd">python3 -c</span> <span class="str">"import yaml,json; print(json.dumps(yaml.safe_load(open('test.yaml')), indent=2))"</span></pre>
+          </div>
+        </div>
+      </div>
+
+      <div class="step">
+        <div class="step-num">5</div>
+        <div class="step-content">
+          <h4>Network Inspection</h4>
+          <p>Inspect what's happening on your network — practice the tools you'll use in Kubernetes debugging.</p>
+          <div class="code-block" style="margin-top:0.75rem">
+            <div class="code-header"><div class="code-dots"><span></span><span></span><span></span></div><div class="code-lang">bash</div></div>
+            <pre><span class="cmt"># What's listening on ports?</span>
+<span class="cmd">ss -tlnp</span>
+
+<span class="cmt"># What's your machine's IP?</span>
+<span class="cmd">ip addr show</span>
+
+<span class="cmt"># Test DNS resolution</span>
+<span class="cmd">nslookup</span> google.com
+<span class="cmd">dig</span> +short google.com
+
+<span class="cmt"># Run a temporary container and inspect its network</span>
+<span class="cmd">docker run --rm</span> alpine sh -c <span class="str">"ip addr && cat /etc/resolv.conf && nslookup google.com"</span>
+
+<span class="cmt"># What port is the Docker container using?</span>
+<span class="cmd">lsof -i :8080</span>
+<span class="cmd">curl -v</span> http://localhost:8080  <span class="cmt"># -v shows headers + connection details</span></pre>
+          </div>
+        </div>
+      </div>
+
+      <div class="step">
+        <div class="step-num">6</div>
+        <div class="step-content">
+          <h4>Set Up Your Shell</h4>
+          <p>Configure your shell with aliases and tools you'll use constantly in K8s.</p>
+          <div class="code-block" style="margin-top:0.75rem">
+            <div class="code-header"><div class="code-dots"><span></span><span></span><span></span></div><div class="code-lang">bash</div></div>
+            <pre><span class="cmt"># Add K8s aliases to your shell config</span>
+<span class="cmd">cat</span> >> ~/.bashrc &lt;&lt;<span class="str">'EOF'
+alias k='kubectl'
+alias kg='kubectl get'
+alias kd='kubectl describe'
+alias kl='kubectl logs -f'
+alias kx='kubectl exec -it'
+alias kap='kubectl apply -f'
+source &lt;(kubectl completion bash 2>/dev/null)
+EOF</span>
+
+<span class="cmd">source</span> ~/.bashrc
+
+<span class="cmt"># Install helpful tools (macOS example)</span>
+<span class="cmd">brew install</span> fzf jq tmux httpie
+
+<span class="cmt"># Verify jq works on JSON output</span>
+<span class="cmd">docker inspect</span> test-nginx | <span class="cmd">jq</span> <span class="str">'.[0].NetworkSettings.IPAddress'</span>
+
+<span class="cmt"># Practice tmux: split terminal vertically</span>
+<span class="cmd">tmux new -s k8s</span>
+<span class="cmt"># Ctrl+B then % to split vertical</span>
+<span class="cmt"># Ctrl+B then arrow keys to switch panes</span>
+<span class="cmt"># Ctrl+B then d to detach</span></pre>
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- QUIZ -->
+    <div class="quiz">
+      <div class="quiz-title">// Stage 1 Knowledge Check</div>
+
+      <div class="quiz-q">
+        <p>1. A file has permissions <code>-rwxr-xr--</code>. Can the file's <em>group</em> execute it?</p>
+        <div class="quiz-options">
+          <button class="quiz-opt" onclick="answer(this, true)">Yes — group has r-x (read + execute)</button>
+          <button class="quiz-opt" onclick="answer(this, false)">No — group only has read</button>
+          <button class="quiz-opt" onclick="answer(this, false)">Yes — everyone can execute it</button>
+          <button class="quiz-opt" onclick="answer(this, false)">No — only the owner can execute</button>
+        </div>
+      </div>
+
+      <div class="quiz-q">
+        <p>2. Why should you copy <code>package.json</code> and run <code>npm install</code> <em>before</em> copying the rest of your source code in a Dockerfile?</p>
+        <div class="quiz-options">
+          <button class="quiz-opt" onclick="answer(this, false)">It's required by Docker to resolve dependencies</button>
+          <button class="quiz-opt" onclick="answer(this, true)">Layer caching — dependencies change less often than source code, so Docker reuses the cached layer</button>
+          <button class="quiz-opt" onclick="answer(this, false)">npm install fails if source files are present</button>
+          <button class="quiz-opt" onclick="answer(this, false)">No reason — the order doesn't matter</button>
+        </div>
+      </div>
+
+      <div class="quiz-q">
+        <p>3. What does <code>10.244.0.0/16</code> represent in Kubernetes networking?</p>
+        <div class="quiz-options">
+          <button class="quiz-opt" onclick="answer(this, false)">A single Pod's IP address</button>
+          <button class="quiz-opt" onclick="answer(this, false)">The Kubernetes API server address</button>
+          <button class="quiz-opt" onclick="answer(this, true)">A CIDR range — a block of 65,536 IP addresses for Pods</button>
+          <button class="quiz-opt" onclick="answer(this, false)">The gateway IP of the cluster</button>
+        </div>
+      </div>
+
+      <div class="quiz-q">
+        <p>4. In YAML, what's wrong with this line: <code>version: 1.10</code>?</p>
+        <div class="quiz-options">
+          <button class="quiz-opt" onclick="answer(this, false)">Nothing — it's valid YAML</button>
+          <button class="quiz-opt" onclick="answer(this, false)">It's missing quotes around the key</button>
+          <button class="quiz-opt" onclick="answer(this, true)">1.10 is parsed as float 1.1, not the string "1.10" — use quotes</button>
+          <button class="quiz-opt" onclick="answer(this, false)">YAML doesn't support decimal values</button>
+        </div>
+      </div>
+
+      <div class="quiz-q">
+        <p>5. What does <code>tail -f app.log</code> do?</p>
+        <div class="quiz-options">
+          <button class="quiz-opt" onclick="answer(this, false)">Prints the last line of the file and exits</button>
+          <button class="quiz-opt" onclick="answer(this, false)">Prints the file in reverse order</button>
+          <button class="quiz-opt" onclick="answer(this, true)">Follows the file and prints new lines as they're written — like live logs</button>
+          <button class="quiz-opt" onclick="answer(this, false)">Counts the number of lines in the file</button>
+        </div>
+      </div>
+
+    </div>
+
+    <div class="callout tip">
+      <div class="callout-label">🎯 Ready for Stage 2?</div>
+      <p>If you can comfortably navigate Linux, build and run Docker containers, understand CIDR notation and DNS, write valid YAML, and feel at home in the terminal — you're ready for <strong>Stage 2: Core Kubernetes Concepts</strong>. That's where Pods, Deployments, Services, and kubectl await.</p>
+    </div>
+
+  </section>
+
+</div>
+</main>
+
+<footer>
+  <div class="container">
+    <div class="footer-text">KUBERNETES CRASH COURSE · STAGE 1 · PREREQUISITES</div>
+    <div style="margin-top:0.5rem;font-family:'JetBrains Mono',monospace;font-size:0.65rem;color:#374151">
+      linuxcommand.org &nbsp;·&nbsp; docs.docker.com &nbsp;·&nbsp; yaml.org &nbsp;·&nbsp; tldr.sh
+    </div>
+  </div>
+</footer>
+
+<script>
+  // Progress bar
+  window.addEventListener('scroll', () => {
+    const docH = document.documentElement.scrollHeight - window.innerHeight;
+    const pct = (window.scrollY / docH) * 100;
+    document.getElementById('progress-bar').style.width = pct + '%';
+  });
+
+  // Scroll-triggered section reveal
+  const sections = document.querySelectorAll('section');
+  const observer = new IntersectionObserver((entries) => {
+    entries.forEach(e => {
+      if (e.isIntersecting) e.target.classList.add('visible');
+    });
+  }, { threshold: 0.05 });
+  sections.forEach(s => observer.observe(s));
+
+  // Quiz
+  function answer(btn, correct) {
+    const group = btn.closest('.quiz-options');
+    if (group.dataset.answered) return;
+    group.dataset.answered = 'true';
+    btn.classList.add(correct ? 'correct' : 'wrong');
+    group.querySelectorAll('.quiz-opt').forEach(b => b.style.pointerEvents = 'none');
+    if (!correct) {
+      group.querySelectorAll('.quiz-opt:not(.wrong)').forEach(b => {
+        b.style.opacity = '0.35';
+      });
+    }
+  }
+</script>
+</body>
+</html>

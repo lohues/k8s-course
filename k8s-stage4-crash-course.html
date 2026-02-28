@@ -1,0 +1,1662 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Kubernetes Stage 4 — Real-World Operations Crash Course</title>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;600;700&family=Syne:wght@400;600;700;800&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #09101f;
+    --surface: #0e1829;
+    --surface2: #141f35;
+    --border: #1b2d4a;
+    --accent:  #2dd4bf;   /* teal */
+    --accent2: #38bdf8;   /* sky blue */
+    --accent3: #fb923c;   /* orange */
+    --accent4: #a78bfa;   /* violet */
+    --accent5: #34d399;   /* emerald */
+    --text: #e2e8f0;
+    --muted: #64748b;
+    --danger: #f87171;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Syne', sans-serif;
+    line-height: 1.7;
+    overflow-x: hidden;
+  }
+
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background:
+      radial-gradient(ellipse 70% 45% at 15% 15%, rgba(45,212,191,0.07) 0%, transparent 55%),
+      radial-gradient(ellipse 55% 45% at 85% 75%, rgba(56,189,248,0.06) 0%, transparent 55%);
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .container {
+    max-width: 960px;
+    margin: 0 auto;
+    padding: 0 2rem;
+    position: relative;
+    z-index: 1;
+  }
+
+  /* PROGRESS */
+  .progress-bar-container {
+    position: fixed; top: 0; left: 0; right: 0;
+    height: 2px; background: var(--border); z-index: 100;
+  }
+  #progress-bar {
+    height: 100%;
+    background: linear-gradient(90deg, var(--accent), var(--accent2));
+    width: 0%; transition: width 0.1s;
+  }
+
+  /* HEADER */
+  header { padding: 5rem 0 4rem; border-bottom: 1px solid var(--border); }
+
+  .stage-nav {
+    display: flex; gap: 0.5rem; margin-bottom: 2rem; flex-wrap: wrap;
+  }
+  .stage-pill {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.65rem; letter-spacing: 0.1em;
+    padding: 0.3rem 0.75rem; border-radius: 20px;
+    border: 1px solid var(--border); color: var(--muted);
+  }
+  .stage-pill.active {
+    border-color: rgba(45,212,191,0.5);
+    background: rgba(45,212,191,0.08); color: var(--accent);
+  }
+
+  .badge {
+    display: inline-flex; align-items: center; gap: 0.5rem;
+    background: rgba(45,212,191,0.08);
+    border: 1px solid rgba(45,212,191,0.3); color: var(--accent);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.7rem; letter-spacing: 0.15em; text-transform: uppercase;
+    padding: 0.35rem 0.9rem; border-radius: 2px; margin-bottom: 2rem;
+    animation: glow 3s ease-in-out infinite;
+  }
+  @keyframes glow {
+    0%,100% { box-shadow: none; }
+    50% { box-shadow: 0 0 14px rgba(45,212,191,0.2); }
+  }
+  .badge::before {
+    content: '●'; color: var(--accent5); font-size: 0.6rem;
+    animation: blink 1.5s step-end infinite;
+  }
+  @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0} }
+
+  h1 {
+    font-size: clamp(2.4rem, 5vw, 4rem); font-weight: 800;
+    letter-spacing: -0.02em; line-height: 1.1; margin-bottom: 1.5rem;
+  }
+  h1 .teal   { color: var(--accent); }
+  h1 .sky    { color: var(--accent2); }
+
+  .subtitle {
+    font-size: 1.05rem; color: var(--muted);
+    max-width: 640px; font-weight: 400; line-height: 1.75;
+  }
+
+  .meta-bar { display: flex; gap: 2rem; margin-top: 2.5rem; flex-wrap: wrap; }
+  .meta-item {
+    display: flex; align-items: center; gap: 0.5rem;
+    font-family: 'JetBrains Mono', monospace; font-size: 0.75rem; color: var(--muted);
+  }
+  .dot { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; }
+
+  /* TOC */
+  .toc {
+    background: var(--surface); border: 1px solid var(--border);
+    border-left: 3px solid var(--accent);
+    padding: 2rem; margin: 3rem 0; border-radius: 0 4px 4px 0;
+  }
+  .toc-title {
+    font-family: 'JetBrains Mono', monospace; font-size: 0.7rem;
+    letter-spacing: 0.2em; text-transform: uppercase;
+    color: var(--accent); margin-bottom: 1.2rem;
+  }
+  .toc-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(210px,1fr)); gap: 0.4rem; }
+  .toc-link {
+    color: var(--muted); text-decoration: none; font-size: 0.85rem;
+    padding: 0.3rem 0; display: flex; align-items: center;
+    gap: 0.5rem; transition: color 0.2s;
+  }
+  .toc-link:hover { color: var(--accent); }
+  .toc-link::before { content: '→'; font-size: 0.7rem; opacity: 0.5; }
+
+  /* SECTIONS */
+  section {
+    padding: 4rem 0; border-bottom: 1px solid var(--border);
+    opacity: 0; transform: translateY(20px);
+    transition: opacity 0.5s ease, transform 0.5s ease;
+  }
+  section.visible { opacity: 1; transform: translateY(0); }
+
+  .section-num {
+    font-family: 'JetBrains Mono', monospace; font-size: 0.7rem;
+    color: var(--accent); letter-spacing: 0.2em;
+    text-transform: uppercase; margin-bottom: 0.5rem;
+  }
+
+  h2 {
+    font-size: clamp(1.6rem, 3vw, 2.2rem); font-weight: 700;
+    margin-bottom: 1.5rem; letter-spacing: -0.01em;
+  }
+
+  h3 {
+    font-size: 1.05rem; font-weight: 600; color: var(--accent);
+    margin: 2.5rem 0 0.75rem;
+    font-family: 'JetBrains Mono', monospace;
+  }
+
+  h4 { font-size: 0.95rem; font-weight: 600; color: var(--text); margin: 1.5rem 0 0.5rem; }
+
+  p { color: #94a3b8; margin-bottom: 1rem; font-size: 0.95rem; line-height: 1.75; }
+  strong { color: var(--text); font-weight: 600; }
+
+  code {
+    font-family: 'JetBrains Mono', monospace; font-size: 0.82em;
+    color: var(--accent); background: rgba(45,212,191,0.07);
+    padding: 0.1rem 0.35rem; border-radius: 3px;
+  }
+
+  /* CODE BLOCKS */
+  .code-block {
+    background: #060b16; border: 1px solid var(--border);
+    border-radius: 6px; margin: 1.5rem 0; overflow: hidden;
+  }
+  .code-header {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 0.6rem 1rem; background: var(--surface2);
+    border-bottom: 1px solid var(--border);
+  }
+  .code-lang {
+    font-family: 'JetBrains Mono', monospace; font-size: 0.65rem;
+    letter-spacing: 0.15em; text-transform: uppercase; color: var(--muted);
+  }
+  .code-dots { display: flex; gap: 5px; }
+  .code-dots span { width: 8px; height: 8px; border-radius: 50%; }
+  .code-dots span:nth-child(1) { background: #ff5f56; }
+  .code-dots span:nth-child(2) { background: #ffbd2e; }
+  .code-dots span:nth-child(3) { background: #27c93f; }
+
+  pre {
+    padding: 1.5rem; overflow-x: auto;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.8rem; line-height: 1.85;
+  }
+
+  .k  { color: #2dd4bf; }   /* teal key */
+  .v  { color: #34d399; }   /* green value / string */
+  .n  { color: #fb923c; }   /* orange number */
+  .c  { color: #374151; font-style: italic; } /* comment */
+  .cm { color: #38bdf8; }   /* command */
+  .fl { color: #fbbf24; }   /* flag */
+  .hl { color: #a78bfa; }   /* highlight / keyword */
+  .wt { color: #e2e8f0; }   /* white text */
+  .err{ color: #f87171; }   /* error */
+  .out{ color: #64748b; }   /* output / dim */
+  .em { color: #34d399; }   /* emerald emphasis */
+
+  /* CARDS */
+  .card-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px,1fr)); gap: 1rem; margin: 1.5rem 0; }
+  .card {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 8px; padding: 1.5rem;
+    transition: border-color 0.2s, transform 0.2s;
+  }
+  .card:hover { border-color: var(--accent); transform: translateY(-2px); }
+  .card-icon { font-size: 1.5rem; margin-bottom: 0.75rem; }
+  .card-name {
+    font-family: 'JetBrains Mono', monospace; font-size: 0.85rem;
+    color: var(--accent); font-weight: 600; margin-bottom: 0.5rem;
+  }
+  .card-desc { font-size: 0.82rem; color: var(--muted); line-height: 1.6; }
+
+  /* CALLOUTS */
+  .callout { border-left: 3px solid; padding: 1rem 1.5rem; margin: 1.5rem 0; border-radius: 0 6px 6px 0; }
+  .callout.tip    { border-color: var(--accent5); background: rgba(52,211,153,0.05); }
+  .callout.warn   { border-color: #fbbf24;        background: rgba(251,191,36,0.05); }
+  .callout.info   { border-color: var(--accent2); background: rgba(56,189,248,0.05); }
+  .callout.teal   { border-color: var(--accent);  background: rgba(45,212,191,0.05); }
+  .callout.violet { border-color: var(--accent4); background: rgba(167,139,250,0.05); }
+
+  .callout-label {
+    font-family: 'JetBrains Mono', monospace; font-size: 0.65rem;
+    letter-spacing: 0.15em; text-transform: uppercase;
+    margin-bottom: 0.4rem; font-weight: 700;
+  }
+  .callout.tip    .callout-label { color: var(--accent5); }
+  .callout.warn   .callout-label { color: #fbbf24; }
+  .callout.info   .callout-label { color: var(--accent2); }
+  .callout.teal   .callout-label { color: var(--accent); }
+  .callout.violet .callout-label { color: var(--accent4); }
+  .callout p { color: #94a3b8; margin: 0; font-size: 0.88rem; }
+
+  /* TABLES */
+  .data-table { width: 100%; border-collapse: collapse; margin: 1.5rem 0; font-size: 0.82rem; }
+  .data-table th {
+    font-family: 'JetBrains Mono', monospace; font-size: 0.65rem;
+    letter-spacing: 0.15em; text-transform: uppercase; color: var(--muted);
+    text-align: left; padding: 0.6rem 1rem;
+    border-bottom: 1px solid var(--border); background: var(--surface);
+  }
+  .data-table td { padding: 0.75rem 1rem; border-bottom: 1px solid rgba(27,45,74,0.6); color: #94a3b8; vertical-align: top; }
+  .data-table tr:hover td { background: rgba(45,212,191,0.02); }
+  .data-table code { color: var(--accent); background: rgba(45,212,191,0.07); font-size: 0.78rem; padding: 0.15rem 0.4rem; border-radius: 3px; }
+
+  /* TAGS */
+  .tag { display: inline-block; font-family: 'JetBrains Mono', monospace; font-size: 0.65rem; padding: 0.2rem 0.6rem; border-radius: 2px; margin: 0.15rem; letter-spacing: 0.05em; }
+  .tag.teal   { background: rgba(45,212,191,0.1);  color: var(--accent);  border: 1px solid rgba(45,212,191,0.25); }
+  .tag.sky    { background: rgba(56,189,248,0.1);  color: var(--accent2); border: 1px solid rgba(56,189,248,0.2); }
+  .tag.orange { background: rgba(251,146,60,0.1);  color: var(--accent3); border: 1px solid rgba(251,146,60,0.2); }
+  .tag.violet { background: rgba(167,139,250,0.1); color: var(--accent4); border: 1px solid rgba(167,139,250,0.2); }
+  .tag.green  { background: rgba(52,211,153,0.1);  color: var(--accent5); border: 1px solid rgba(52,211,153,0.2); }
+  .tag.red    { background: rgba(248,113,113,0.1); color: var(--danger);  border: 1px solid rgba(248,113,113,0.2); }
+
+  /* DIAGRAM */
+  .diagram {
+    background: #060b16; border: 1px solid var(--border);
+    border-radius: 8px; padding: 2rem; margin: 1.5rem 0;
+    font-family: 'JetBrains Mono', monospace; font-size: 0.75rem; overflow-x: auto;
+  }
+  .diagram-label { font-size: 0.62rem; letter-spacing: 0.2em; text-transform: uppercase; color: var(--muted); margin-bottom: 1.5rem; }
+  .d-row { display: flex; align-items: center; gap: 0.75rem; margin-bottom: 0.75rem; flex-wrap: wrap; }
+  .d-box { border: 1px solid; border-radius: 5px; padding: 0.6rem 1rem; text-align: center; min-width: 110px; line-height: 1.4; font-size: 0.72rem; }
+  .d-box.teal   { border-color: rgba(45,212,191,0.4);  background: rgba(45,212,191,0.05);  color: var(--accent); }
+  .d-box.sky    { border-color: rgba(56,189,248,0.4);  background: rgba(56,189,248,0.05);  color: var(--accent2); }
+  .d-box.orange { border-color: rgba(251,146,60,0.4);  background: rgba(251,146,60,0.05);  color: var(--accent3); }
+  .d-box.violet { border-color: rgba(167,139,250,0.4); background: rgba(167,139,250,0.05); color: var(--accent4); }
+  .d-box.green  { border-color: rgba(52,211,153,0.4);  background: rgba(52,211,153,0.05);  color: var(--accent5); }
+  .d-box.gray   { border-color: var(--border);          background: var(--surface2);        color: var(--muted); }
+  .d-arrow { color: var(--muted); font-size: 1rem; flex-shrink: 0; }
+  .d-col  { display: flex; flex-direction: column; gap: 0.4rem; }
+
+  /* CHEAT SHEET BOXES */
+  .cheat-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px,1fr)); gap: 1rem; margin: 1.5rem 0; }
+  .cheat-box { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; overflow: hidden; }
+  .cheat-box.teal-top   { border-top: 2px solid var(--accent); }
+  .cheat-box.sky-top    { border-top: 2px solid var(--accent2); }
+  .cheat-box.orange-top { border-top: 2px solid var(--accent3); }
+  .cheat-box.violet-top { border-top: 2px solid var(--accent4); }
+  .cheat-box.green-top  { border-top: 2px solid var(--accent5); }
+  .cheat-box-title {
+    font-family: 'JetBrains Mono', monospace; font-size: 0.65rem;
+    letter-spacing: 0.18em; text-transform: uppercase;
+    padding: 0.6rem 1rem; background: var(--surface2); border-bottom: 1px solid var(--border);
+  }
+  .cheat-box.teal-top   .cheat-box-title { color: var(--accent); }
+  .cheat-box.sky-top    .cheat-box-title { color: var(--accent2); }
+  .cheat-box.orange-top .cheat-box-title { color: var(--accent3); }
+  .cheat-box.violet-top .cheat-box-title { color: var(--accent4); }
+  .cheat-box.green-top  .cheat-box-title { color: var(--accent5); }
+  .cheat-row { display: flex; align-items: baseline; gap: 0.75rem; padding: 0.45rem 1rem; border-bottom: 1px solid rgba(27,45,74,0.5); font-size: 0.78rem; }
+  .cheat-row:last-child { border-bottom: none; }
+  .cheat-cmd { font-family: 'JetBrains Mono', monospace; color: var(--accent5); white-space: nowrap; min-width: 130px; flex-shrink: 0; font-size: 0.75rem; }
+  .cheat-desc { color: var(--muted); line-height: 1.4; }
+
+  /* STEPS */
+  .steps { margin: 1.5rem 0; }
+  .step { display: flex; gap: 1.5rem; margin-bottom: 2rem; align-items: flex-start; }
+  .step-num {
+    flex-shrink: 0; width: 36px; height: 36px;
+    border: 2px solid var(--accent); border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-family: 'JetBrains Mono', monospace; font-size: 0.8rem;
+    color: var(--accent); font-weight: 700;
+  }
+  .step-content h4 { font-size: 1rem; font-weight: 600; margin-bottom: 0.4rem; }
+  .step-content p  { font-size: 0.85rem; margin: 0 0 0.5rem; }
+
+  /* COMPARE */
+  .compare { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin: 1.5rem 0; }
+  .compare-col { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 1.25rem; }
+  .compare-col.teal-t  { border-top: 2px solid var(--accent); }
+  .compare-col.sky-t   { border-top: 2px solid var(--accent2); }
+  .compare-col.orange-t{ border-top: 2px solid var(--accent3); }
+  .compare-col-title {
+    font-family: 'JetBrains Mono', monospace; font-size: 0.7rem;
+    letter-spacing: 0.15em; text-transform: uppercase;
+    margin-bottom: 1rem; padding-bottom: 0.75rem; border-bottom: 1px solid var(--border);
+  }
+  .compare-col.teal-t   .compare-col-title { color: var(--accent); }
+  .compare-col.sky-t    .compare-col-title { color: var(--accent2); }
+  .compare-col.orange-t .compare-col-title { color: var(--accent3); }
+  .compare-item { display: flex; align-items: flex-start; gap: 0.5rem; margin-bottom: 0.5rem; font-size: 0.82rem; color: #94a3b8; }
+  .compare-item::before { content: '·'; color: var(--muted); flex-shrink: 0; }
+
+  /* QUIZ */
+  .quiz { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 2rem; margin: 2rem 0; }
+  .quiz-title { font-family: 'JetBrains Mono', monospace; font-size: 0.7rem; letter-spacing: 0.2em; text-transform: uppercase; color: #fbbf24; margin-bottom: 1.5rem; }
+  .quiz-q { margin-bottom: 1.5rem; }
+  .quiz-q p { color: var(--text); font-weight: 600; font-size: 0.9rem; margin-bottom: 0.75rem; }
+  .quiz-options { display: flex; flex-direction: column; gap: 0.4rem; }
+  .quiz-opt {
+    background: var(--surface2); border: 1px solid var(--border);
+    border-radius: 4px; padding: 0.6rem 1rem; font-size: 0.82rem;
+    cursor: pointer; transition: all 0.15s; color: #94a3b8;
+    text-align: left; font-family: 'Syne', sans-serif;
+  }
+  .quiz-opt:hover { border-color: var(--accent); color: var(--text); }
+  .quiz-opt.correct { border-color: var(--accent5); background: rgba(52,211,153,0.1);  color: var(--accent5); pointer-events: none; }
+  .quiz-opt.wrong   { border-color: var(--danger);  background: rgba(248,113,113,0.1); color: var(--danger);  pointer-events: none; }
+
+  /* CLOUD COMPARISON GRID */
+  .cloud-grid { display: grid; grid-template-columns: repeat(3,1fr); gap: 1rem; margin: 1.5rem 0; }
+  .cloud-card { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; overflow: hidden; }
+  .cloud-card-header { padding: 1rem 1.25rem; font-weight: 700; font-size: 0.9rem; border-bottom: 1px solid var(--border); }
+  .cloud-card.aws .cloud-card-header   { border-top: 3px solid #ff9900; color: #ff9900; }
+  .cloud-card.gcp .cloud-card-header   { border-top: 3px solid #4285f4; color: #4285f4; }
+  .cloud-card.azure .cloud-card-header { border-top: 3px solid #0089d6; color: #0089d6; }
+  .cloud-row { padding: 0.5rem 1.25rem; border-bottom: 1px solid rgba(27,45,74,0.4); font-size: 0.78rem; }
+  .cloud-row:last-child { border-bottom: none; }
+  .cloud-label { font-family: 'JetBrains Mono', monospace; font-size: 0.65rem; color: var(--muted); display: block; margin-bottom: 0.1rem; }
+  .cloud-val   { color: #94a3b8; }
+
+  footer { padding: 3rem 0; text-align: center; }
+  .footer-text { font-family: 'JetBrains Mono', monospace; font-size: 0.7rem; color: var(--muted); letter-spacing: 0.1em; }
+
+  @media (max-width: 660px) {
+    .compare, .cloud-grid { grid-template-columns: 1fr; }
+    .card-grid, .cheat-grid { grid-template-columns: 1fr; }
+    .d-row { flex-direction: column; }
+  }
+</style>
+</head>
+<body>
+
+<div class="progress-bar-container"><div id="progress-bar"></div></div>
+
+<!-- ══════════════════════ HEADER -->
+<header>
+  <div class="container">
+    <div class="stage-nav">
+      <div class="stage-pill">Stage 1 · Prerequisites</div>
+      <div class="stage-pill">Stage 2 · Core Concepts</div>
+      <div class="stage-pill">Stage 3 · Intermediate</div>
+      <div class="stage-pill active">Stage 4 · Operations ←</div>
+      <div class="stage-pill">Stage 5 · Advanced</div>
+    </div>
+    <div class="badge">Stage 4 · Real-World Operations</div>
+    <h1>Running<br><span class="teal">Kubernetes</span><br>in <span class="sky">Production</span></h1>
+    <p class="subtitle">Helm packaging, GitOps, observability with Prometheus & Grafana, auto-scaling, multi-environment strategies, and managed clusters on AWS, GCP, and Azure.</p>
+    <div class="meta-bar">
+      <div class="meta-item"><div class="dot" style="background:var(--accent)"></div> 7 Topics</div>
+      <div class="meta-item"><div class="dot" style="background:#fbbf24"></div> ~5–6 Hours</div>
+      <div class="meta-item"><div class="dot" style="background:var(--accent5)"></div> Production-Focused</div>
+      <div class="meta-item"><div class="dot" style="background:var(--accent4)"></div> Requires Stages 1–3</div>
+    </div>
+  </div>
+</header>
+
+<main>
+<div class="container">
+
+  <nav class="toc">
+    <div class="toc-title">// Table of Contents</div>
+    <div class="toc-grid">
+      <a href="#helm"        class="toc-link">Helm — Package Manager</a>
+      <a href="#cicd"        class="toc-link">CI/CD Integration</a>
+      <a href="#gitops"      class="toc-link">GitOps with ArgoCD</a>
+      <a href="#monitoring"  class="toc-link">Monitoring & Logging</a>
+      <a href="#autoscaling" class="toc-link">Auto-Scaling (HPA/VPA)</a>
+      <a href="#multienv"    class="toc-link">Multi-Environment</a>
+      <a href="#managed"     class="toc-link">Managed Kubernetes</a>
+      <a href="#hands-on"   class="toc-link">Hands-On Lab</a>
+    </div>
+  </nav>
+
+  <!-- ══════════════════════════════════════════ SECTION 1: HELM -->
+  <section id="helm">
+    <div class="section-num">// 01</div>
+    <h2>Helm — The Kubernetes Package Manager</h2>
+    <p>Deploying a real application to Kubernetes means managing dozens of YAML files — Deployments, Services, ConfigMaps, Ingress, RBAC, and more. <strong>Helm</strong> bundles all of this into a reusable, versioned package called a <strong>Chart</strong>.</p>
+
+    <div class="diagram">
+      <div class="diagram-label">Helm Architecture</div>
+      <div class="d-row">
+        <div class="d-box teal">Chart<br><small>templates/ + values.yaml</small></div>
+        <div class="d-arrow">+</div>
+        <div class="d-box sky">values.yaml<br><small>your overrides</small></div>
+        <div class="d-arrow">→ helm install →</div>
+        <div class="d-box green">Release<br><small>running in cluster</small></div>
+      </div>
+      <div style="margin-top:1rem" class="d-row">
+        <div class="d-box gray">Chart Repository<br><small>Artifact Hub, ECR, OCI</small></div>
+        <div class="d-arrow">→ helm repo add / pull →</div>
+        <div class="d-box violet">Local Chart Cache</div>
+        <div class="d-arrow">→ helm upgrade →</div>
+        <div class="d-box orange">Updated Release</div>
+      </div>
+    </div>
+
+    <h3>// Core Concepts</h3>
+    <p><strong>Chart</strong> — a Helm package. Contains Kubernetes YAML templates + a <code>values.yaml</code> for defaults.<br>
+    <strong>Release</strong> — an instance of a Chart installed in a cluster. You can install the same Chart multiple times with different names.<br>
+    <strong>Repository</strong> — a collection of Charts, hosted remotely (like npm registry or Docker Hub).<br>
+    <strong>Values</strong> — configuration that gets injected into templates at install/upgrade time.</p>
+
+    <h3>// Essential Helm Commands</h3>
+
+    <div class="cheat-grid">
+      <div class="cheat-box teal-top">
+        <div class="cheat-box-title">Repos & Search</div>
+        <div class="cheat-row"><span class="cheat-cmd">helm repo add</span><span class="cheat-desc">Add a chart repository</span></div>
+        <div class="cheat-row"><span class="cheat-cmd">helm repo update</span><span class="cheat-desc">Refresh the local repo index</span></div>
+        <div class="cheat-row"><span class="cheat-cmd">helm repo list</span><span class="cheat-desc">Show configured repositories</span></div>
+        <div class="cheat-row"><span class="cheat-cmd">helm search repo nginx</span><span class="cheat-desc">Search repos for a chart</span></div>
+        <div class="cheat-row"><span class="cheat-cmd">helm search hub nginx</span><span class="cheat-desc">Search Artifact Hub</span></div>
+        <div class="cheat-row"><span class="cheat-cmd">helm pull chart --untar</span><span class="cheat-desc">Download & extract a chart locally</span></div>
+      </div>
+      <div class="cheat-box sky-top">
+        <div class="cheat-box-title">Install & Upgrade</div>
+        <div class="cheat-row"><span class="cheat-cmd">helm install NAME chart</span><span class="cheat-desc">Install a chart as release NAME</span></div>
+        <div class="cheat-row"><span class="cheat-cmd">helm upgrade NAME chart</span><span class="cheat-desc">Upgrade existing release</span></div>
+        <div class="cheat-row"><span class="cheat-cmd">helm upgrade --install</span><span class="cheat-desc">Install if not exists, else upgrade</span></div>
+        <div class="cheat-row"><span class="cheat-cmd">helm install -f vals.yaml</span><span class="cheat-desc">Override values from file</span></div>
+        <div class="cheat-row"><span class="cheat-cmd">helm install --set k=v</span><span class="cheat-desc">Override a single value inline</span></div>
+        <div class="cheat-row"><span class="cheat-cmd">helm install --dry-run</span><span class="cheat-desc">Preview rendered manifests</span></div>
+      </div>
+      <div class="cheat-box green-top">
+        <div class="cheat-box-title">Manage Releases</div>
+        <div class="cheat-row"><span class="cheat-cmd">helm list</span><span class="cheat-desc">List all releases in namespace</span></div>
+        <div class="cheat-row"><span class="cheat-cmd">helm status NAME</span><span class="cheat-desc">Show release status & notes</span></div>
+        <div class="cheat-row"><span class="cheat-cmd">helm history NAME</span><span class="cheat-desc">Show release revision history</span></div>
+        <div class="cheat-row"><span class="cheat-cmd">helm rollback NAME 2</span><span class="cheat-desc">Roll back to revision 2</span></div>
+        <div class="cheat-row"><span class="cheat-cmd">helm uninstall NAME</span><span class="cheat-desc">Delete a release</span></div>
+        <div class="cheat-row"><span class="cheat-cmd">helm get values NAME</span><span class="cheat-desc">Show current values in use</span></div>
+      </div>
+      <div class="cheat-box violet-top">
+        <div class="cheat-box-title">Development</div>
+        <div class="cheat-row"><span class="cheat-cmd">helm create myapp</span><span class="cheat-desc">Scaffold a new chart</span></div>
+        <div class="cheat-row"><span class="cheat-cmd">helm lint ./myapp</span><span class="cheat-desc">Check chart for errors</span></div>
+        <div class="cheat-row"><span class="cheat-cmd">helm template NAME ./c</span><span class="cheat-desc">Render templates without deploying</span></div>
+        <div class="cheat-row"><span class="cheat-cmd">helm package ./myapp</span><span class="cheat-desc">Build a .tgz chart archive</span></div>
+        <div class="cheat-row"><span class="cheat-cmd">helm push chart oci://</span><span class="cheat-desc">Push chart to OCI registry</span></div>
+        <div class="cheat-row"><span class="cheat-cmd">helm plugin install URL</span><span class="cheat-desc">Install a Helm plugin</span></div>
+      </div>
+    </div>
+
+    <h3>// Chart Structure</h3>
+
+    <div class="code-block">
+      <div class="code-header"><div class="code-dots"><span></span><span></span><span></span></div><div class="code-lang">bash · helm chart directory layout</div></div>
+      <pre><span class="cm">helm</span> create myapp
+
+<span class="out">myapp/
+├── Chart.yaml          ← chart metadata (name, version, description)
+├── values.yaml         ← default configuration values
+├── charts/             ← sub-chart dependencies go here
+├── templates/
+│   ├── deployment.yaml ← K8s manifests using {{ .Values.xxx }} syntax
+│   ├── service.yaml
+│   ├── ingress.yaml
+│   ├── configmap.yaml
+│   ├── _helpers.tpl    ← reusable template snippets (named templates)
+│   ├── NOTES.txt       ← displayed after helm install
+│   └── tests/
+│       └── test-connection.yaml
+└── .helmignore         ← like .gitignore, for chart packaging</span></pre>
+    </div>
+
+    <h3>// Writing Helm Templates</h3>
+    <p>Templates use Go templating syntax. Values from <code>values.yaml</code> are injected via <code>{{ .Values.key }}</code>.</p>
+
+    <div class="code-block">
+      <div class="code-header"><div class="code-dots"><span></span><span></span><span></span></div><div class="code-lang">yaml · templates/deployment.yaml</div></div>
+      <pre><span class="k">apiVersion</span>: <span class="v">apps/v1</span>
+<span class="k">kind</span>: <span class="v">Deployment</span>
+<span class="k">metadata</span>:
+  <span class="k">name</span>: <span class="hl">{{ include "myapp.fullname" . }}</span>
+  <span class="k">labels</span>:
+    <span class="hl">{{- include "myapp.labels" . | nindent 4 }}</span>
+<span class="k">spec</span>:
+  <span class="k">replicas</span>: <span class="hl">{{ .Values.replicaCount }}</span>
+  <span class="k">selector</span>:
+    <span class="k">matchLabels</span>:
+      <span class="hl">{{- include "myapp.selectorLabels" . | nindent 6 }}</span>
+  <span class="k">template</span>:
+    <span class="k">spec</span>:
+      <span class="k">containers</span>:
+      - <span class="k">name</span>: <span class="hl">{{ .Chart.Name }}</span>
+        <span class="k">image</span>: <span class="v">"</span><span class="hl">{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}</span><span class="v">"</span>
+        <span class="k">ports</span>:
+        - <span class="k">containerPort</span>: <span class="hl">{{ .Values.service.port }}</span>
+        <span class="hl">{{- if .Values.resources }}</span>   <span class="c">← conditional block</span>
+        <span class="k">resources</span>:
+          <span class="hl">{{- toYaml .Values.resources | nindent 10 }}</span>
+        <span class="hl">{{- end }}</span></pre>
+    </div>
+
+    <div class="code-block">
+      <div class="code-header"><div class="code-dots"><span></span><span></span><span></span></div><div class="code-lang">yaml · values.yaml — defaults</div></div>
+      <pre><span class="k">replicaCount</span>: <span class="n">2</span>
+
+<span class="k">image</span>:
+  <span class="k">repository</span>: <span class="v">nginx</span>
+  <span class="k">tag</span>: <span class="v">""</span>          <span class="c"># defaults to chart's appVersion</span>
+  <span class="k">pullPolicy</span>: <span class="v">IfNotPresent</span>
+
+<span class="k">service</span>:
+  <span class="k">type</span>: <span class="v">ClusterIP</span>
+  <span class="k">port</span>: <span class="n">80</span>
+
+<span class="k">ingress</span>:
+  <span class="k">enabled</span>: <span class="hl">false</span>   <span class="c"># feature flags — enable per environment</span>
+  <span class="k">className</span>: <span class="v">nginx</span>
+  <span class="k">host</span>: <span class="v">app.example.com</span>
+
+<span class="k">resources</span>:
+  <span class="k">requests</span>: { <span class="k">cpu</span>: <span class="v">100m</span>, <span class="k">memory</span>: <span class="v">128Mi</span> }
+  <span class="k">limits</span>:   { <span class="k">cpu</span>: <span class="v">500m</span>, <span class="k">memory</span>: <span class="v">256Mi</span> }</pre>
+    </div>
+
+    <div class="code-block">
+      <div class="code-header"><div class="code-dots"><span></span><span></span><span></span></div><div class="code-lang">bash · overriding values per environment</div></div>
+      <pre><span class="c"># production overrides (values-prod.yaml)</span>
+<span class="c"># replicaCount: 5, ingress.enabled: true, etc.</span>
+
+<span class="cm">helm</span> upgrade --install myapp ./myapp \
+  <span class="fl">-f</span> values.yaml \
+  <span class="fl">-f</span> values-prod.yaml \          <span class="c"># layered — prod overrides base</span>
+  <span class="fl">--set</span> image.tag=v2.3.1 \      <span class="c"># override single value inline</span>
+  <span class="fl">--namespace</span> production \
+  <span class="fl">--create-namespace</span> \
+  <span class="fl">--wait</span> \                       <span class="c"># block until all pods are ready</span>
+  <span class="fl">--timeout</span> 5m</pre>
+    </div>
+
+    <div class="callout teal">
+      <div class="callout-label">💡 Artifact Hub</div>
+      <p>Search <strong>artifacthub.io</strong> before writing a chart from scratch. Charts for nginx, cert-manager, prometheus, postgres, redis, and hundreds more are already production-ready and maintained by the community.</p>
+    </div>
+  </section>
+
+  <!-- ══════════════════════════════════════════ SECTION 2: CI/CD -->
+  <section id="cicd">
+    <div class="section-num">// 02</div>
+    <h2>CI/CD Integration</h2>
+    <p>CI/CD pipelines automate building, testing, and deploying your application. In a Kubernetes world, the pipeline builds a container image, pushes it to a registry, and then updates the cluster.</p>
+
+    <div class="diagram">
+      <div class="diagram-label">CI/CD Pipeline — Kubernetes Deployment Flow</div>
+      <div class="d-row">
+        <div class="d-box gray">Code Push<br><small>git commit</small></div>
+        <div class="d-arrow">→</div>
+        <div class="d-box teal">CI Pipeline<br><small>build + test</small></div>
+        <div class="d-arrow">→</div>
+        <div class="d-box sky">Docker Build<br><small>tag: sha-abc123</small></div>
+        <div class="d-arrow">→</div>
+        <div class="d-box violet">Push to Registry<br><small>ECR / GCR / GHCR</small></div>
+        <div class="d-arrow">→</div>
+        <div class="d-box green">Deploy to K8s<br><small>helm upgrade / kubectl</small></div>
+      </div>
+    </div>
+
+    <h3>// GitHub Actions Pipeline</h3>
+    <p>GitHub Actions is the most common CI/CD choice for Kubernetes projects. Here's a production-grade pipeline that builds, tests, and deploys on every push to <code>main</code>.</p>
+
+    <div class="code-block">
+      <div class="code-header"><div class="code-dots"><span></span><span></span><span></span></div><div class="code-lang">yaml · .github/workflows/deploy.yaml</div></div>
+      <pre><span class="k">name</span>: <span class="v">Build and Deploy</span>
+
+<span class="k">on</span>:
+  <span class="k">push</span>:
+    <span class="k">branches</span>: [<span class="v">main</span>]
+
+<span class="k">env</span>:
+  <span class="k">IMAGE</span>: <span class="v">ghcr.io/${{ github.repository }}/app</span>
+  <span class="k">TAG</span>: <span class="v">${{ github.sha }}</span>
+
+<span class="k">jobs</span>:
+  <span class="c"># ── Job 1: Build & push Docker image ──────────────────</span>
+  <span class="k">build</span>:
+    <span class="k">runs-on</span>: <span class="v">ubuntu-latest</span>
+    <span class="k">steps</span>:
+    - <span class="k">uses</span>: <span class="v">actions/checkout@v4</span>
+
+    - <span class="k">name</span>: <span class="v">Log in to GHCR</span>
+      <span class="k">uses</span>: <span class="v">docker/login-action@v3</span>
+      <span class="k">with</span>:
+        <span class="k">registry</span>: <span class="v">ghcr.io</span>
+        <span class="k">username</span>: <span class="v">${{ github.actor }}</span>
+        <span class="k">password</span>: <span class="v">${{ secrets.GITHUB_TOKEN }}</span>
+
+    - <span class="k">name</span>: <span class="v">Build and push</span>
+      <span class="k">uses</span>: <span class="v">docker/build-push-action@v5</span>
+      <span class="k">with</span>:
+        <span class="k">push</span>: <span class="hl">true</span>
+        <span class="k">tags</span>: <span class="v">${{ env.IMAGE }}:${{ env.TAG }},${{ env.IMAGE }}:latest</span>
+        <span class="k">cache-from</span>: <span class="v">type=gha</span>     <span class="c"># GitHub Actions layer cache</span>
+        <span class="k">cache-to</span>: <span class="v">type=gha,mode=max</span>
+
+  <span class="c"># ── Job 2: Deploy to staging first ───────────────────</span>
+  <span class="k">deploy-staging</span>:
+    <span class="k">needs</span>: <span class="v">build</span>
+    <span class="k">runs-on</span>: <span class="v">ubuntu-latest</span>
+    <span class="k">environment</span>: <span class="v">staging</span>
+    <span class="k">steps</span>:
+    - <span class="k">uses</span>: <span class="v">actions/checkout@v4</span>
+
+    - <span class="k">name</span>: <span class="v">Configure kubectl</span>
+      <span class="k">uses</span>: <span class="v">azure/k8s-set-context@v3</span>
+      <span class="k">with</span>:
+        <span class="k">kubeconfig</span>: <span class="v">${{ secrets.KUBECONFIG_STAGING }}</span>
+
+    - <span class="k">name</span>: <span class="v">Deploy with Helm</span>
+      <span class="k">run</span>: |
+        <span class="cm">helm</span> upgrade --install myapp ./helm/myapp \
+          <span class="fl">--namespace</span> staging \
+          <span class="fl">--set</span> image.tag=<span class="v">${{ env.TAG }}</span> \
+          <span class="fl">--wait</span> --timeout 5m
+
+  <span class="c"># ── Job 3: Production (requires approval) ─────────────</span>
+  <span class="k">deploy-production</span>:
+    <span class="k">needs</span>: <span class="v">deploy-staging</span>
+    <span class="k">runs-on</span>: <span class="v">ubuntu-latest</span>
+    <span class="k">environment</span>: <span class="v">production</span>   <span class="c"># ← GitHub env with required reviewers</span>
+    <span class="k">steps</span>:
+    - <span class="k">name</span>: <span class="v">Deploy with Helm</span>
+      <span class="k">run</span>: |
+        <span class="cm">helm</span> upgrade --install myapp ./helm/myapp \
+          <span class="fl">--namespace</span> production \
+          <span class="fl">--set</span> image.tag=<span class="v">${{ env.TAG }}</span> \
+          <span class="fl">-f</span> helm/values-prod.yaml \
+          <span class="fl">--atomic</span>                <span class="c"># rollback automatically on failure</span></pre>
+    </div>
+
+    <div class="callout tip">
+      <div class="callout-label">✅ Best Practices</div>
+      <p>Always tag images with the <strong>git commit SHA</strong> (not <code>latest</code>) — this makes every deployment traceable and rollback deterministic. Use <strong>GitHub Environments</strong> to require human approval before production deploys.</p>
+    </div>
+  </section>
+
+  <!-- ══════════════════════════════════════════ SECTION 3: GITOPS -->
+  <section id="gitops">
+    <div class="section-num">// 03</div>
+    <h2>GitOps with ArgoCD</h2>
+    <p>Traditional CI/CD pushes changes to the cluster. <strong>GitOps</strong> flips this: the cluster <em>pulls</em> its desired state from a Git repository and continuously reconciles to match it. Git becomes the single source of truth.</p>
+
+    <div class="compare">
+      <div class="compare-col orange-t">
+        <div class="compare-col-title">Traditional CI/CD (Push)</div>
+        <div class="compare-item">Pipeline has cluster credentials</div>
+        <div class="compare-item">Pipeline runs kubectl/helm commands</div>
+        <div class="compare-item">Cluster state can drift without detection</div>
+        <div class="compare-item">Hard to audit — who deployed what?</div>
+        <div class="compare-item">Rollback = re-run old pipeline</div>
+      </div>
+      <div class="compare-col teal-t">
+        <div class="compare-col-title">GitOps (Pull — ArgoCD)</div>
+        <div class="compare-item">Cluster pulls from Git — no external credentials needed</div>
+        <div class="compare-item">ArgoCD agent runs inside the cluster</div>
+        <div class="compare-item">Drift detected and auto-corrected in real time</div>
+        <div class="compare-item">Full audit trail — every change is a git commit</div>
+        <div class="compare-item">Rollback = git revert (instant)</div>
+      </div>
+    </div>
+
+    <h3>// ArgoCD Architecture</h3>
+
+    <div class="diagram">
+      <div class="diagram-label">GitOps Reconciliation Loop</div>
+      <div class="d-row">
+        <div class="d-box gray">Dev pushes code<br><small>git push</small></div>
+        <div class="d-arrow">→</div>
+        <div class="d-box sky">CI updates image tag<br><small>in Git repo manifests</small></div>
+        <div class="d-arrow">→</div>
+        <div class="d-box teal">ArgoCD detects diff<br><small>desired ≠ actual</small></div>
+        <div class="d-arrow">→</div>
+        <div class="d-box green">ArgoCD syncs<br><small>applies to cluster</small></div>
+      </div>
+      <div style="margin-top:0.75rem;font-size:0.7rem;color:var(--muted)">
+        ArgoCD polls every 3 minutes or via webhook. Sync can be automatic or manual with approval.
+      </div>
+    </div>
+
+    <h3>// Installing ArgoCD</h3>
+
+    <div class="code-block">
+      <div class="code-header"><div class="code-dots"><span></span><span></span><span></span></div><div class="code-lang">bash · install argocd</div></div>
+      <pre><span class="c"># Create namespace and install</span>
+<span class="cm">kubectl</span> create namespace argocd
+<span class="cm">kubectl</span> apply <span class="fl">-n</span> argocd \
+  <span class="fl">-f</span> https://raw.githubusercontent.com/argoproj/argo-cd/stable/manifests/install.yaml
+
+<span class="c"># Wait for all pods to be ready</span>
+<span class="cm">kubectl</span> wait <span class="fl">--for=condition=ready</span> pod \
+  <span class="fl">-l</span> app.kubernetes.io/name=argocd-server \
+  <span class="fl">-n</span> argocd <span class="fl">--timeout=120s</span>
+
+<span class="c"># Access the UI (port-forward)</span>
+<span class="cm">kubectl</span> port-forward svc/argocd-server <span class="fl">-n</span> argocd 8080:443 &
+
+<span class="c"># Get initial admin password</span>
+<span class="cm">kubectl</span> <span class="fl">-n</span> argocd get secret argocd-initial-admin-secret \
+  <span class="fl">-o</span> jsonpath=<span class="v">"{.data.password}"</span> | base64 <span class="fl">-d</span>
+
+<span class="c"># Install ArgoCD CLI</span>
+<span class="cm">brew</span> install argocd
+<span class="cm">argocd</span> login localhost:8080 <span class="fl">--username</span> admin <span class="fl">--insecure</span></pre>
+    </div>
+
+    <h3>// Defining an ArgoCD Application</h3>
+
+    <div class="code-block">
+      <div class="code-header"><div class="code-dots"><span></span><span></span><span></span></div><div class="code-lang">yaml · argocd-app.yaml</div></div>
+      <pre><span class="k">apiVersion</span>: <span class="v">argoproj.io/v1alpha1</span>
+<span class="k">kind</span>: <span class="v">Application</span>
+<span class="k">metadata</span>:
+  <span class="k">name</span>: <span class="v">my-production-app</span>
+  <span class="k">namespace</span>: <span class="v">argocd</span>
+<span class="k">spec</span>:
+  <span class="k">project</span>: <span class="v">default</span>
+
+  <span class="k">source</span>:
+    <span class="k">repoURL</span>: <span class="v">https://github.com/my-org/k8s-configs</span>
+    <span class="k">targetRevision</span>: <span class="v">HEAD</span>      <span class="c"># or a specific branch/tag/commit</span>
+    <span class="k">path</span>: <span class="v">apps/my-app/production</span>   <span class="c"># path within the repo</span>
+    <span class="k">helm</span>:                           <span class="c"># if using Helm charts</span>
+      <span class="k">valueFiles</span>:
+        - <span class="v">values.yaml</span>
+        - <span class="v">values-prod.yaml</span>
+
+  <span class="k">destination</span>:
+    <span class="k">server</span>: <span class="v">https://kubernetes.default.svc</span>  <span class="c"># in-cluster</span>
+    <span class="k">namespace</span>: <span class="v">production</span>
+
+  <span class="k">syncPolicy</span>:
+    <span class="k">automated</span>:
+      <span class="k">prune</span>: <span class="hl">true</span>      <span class="c"># delete resources removed from Git</span>
+      <span class="k">selfHeal</span>: <span class="hl">true</span>   <span class="c"># auto-correct drift</span>
+    <span class="k">syncOptions</span>:
+      - <span class="v">CreateNamespace=true</span>
+      - <span class="v">ServerSideApply=true</span></pre>
+    </div>
+
+    <div class="code-block">
+      <div class="code-header"><div class="code-dots"><span></span><span></span><span></span></div><div class="code-lang">bash · argocd cli commands</div></div>
+      <pre><span class="c"># Apply the Application</span>
+<span class="cm">kubectl</span> apply <span class="fl">-f</span> argocd-app.yaml
+
+<span class="c"># List all apps and their sync status</span>
+<span class="cm">argocd</span> app list
+<span class="out">NAME              CLUSTER    NAMESPACE   STATUS    HEALTH   SYNC
+my-production-app in-cluster production  Synced    Healthy  Synced</span>
+
+<span class="c"># Manually trigger sync</span>
+<span class="cm">argocd</span> app sync my-production-app
+
+<span class="c"># Show differences between Git and live cluster</span>
+<span class="cm">argocd</span> app diff my-production-app
+
+<span class="c"># Roll back to previous revision</span>
+<span class="cm">argocd</span> app history my-production-app
+<span class="cm">argocd</span> app rollback my-production-app 3</pre>
+    </div>
+
+    <div class="callout violet">
+      <div class="callout-label">📁 Repo Structure Tip</div>
+      <p>Keep a separate <strong>config repo</strong> from your <strong>app repo</strong>. The config repo holds all Kubernetes manifests and Helm values. The CI pipeline updates image tags in the config repo. ArgoCD watches the config repo. This separation prevents a single repo from mixing code and infrastructure concerns.</p>
+    </div>
+  </section>
+
+  <!-- ══════════════════════════════════════════ SECTION 4: MONITORING -->
+  <section id="monitoring">
+    <div class="section-num">// 04</div>
+    <h2>Monitoring & Logging</h2>
+    <p>In production, blind deployment is negligence. You need metrics (what's happening numerically), logs (what events occurred), and alerts (when to wake someone up at 3am).</p>
+
+    <div class="card-grid">
+      <div class="card">
+        <div class="card-icon">📊</div>
+        <div class="card-name">Prometheus</div>
+        <div class="card-desc">Metrics collection & storage. Scrapes HTTP endpoints (your app + K8s components) and stores time-series data.</div>
+        <div style="margin-top:0.75rem"><span class="tag teal">metrics</span><span class="tag sky">scraping</span></div>
+      </div>
+      <div class="card">
+        <div class="card-icon">📈</div>
+        <div class="card-name">Grafana</div>
+        <div class="card-desc">Visualization layer. Connects to Prometheus (and other sources) to display dashboards, graphs, and alerts.</div>
+        <div style="margin-top:0.75rem"><span class="tag violet">dashboards</span><span class="tag green">alerting</span></div>
+      </div>
+      <div class="card">
+        <div class="card-icon">📝</div>
+        <div class="card-name">Loki</div>
+        <div class="card-desc">Log aggregation by Grafana Labs. Like Prometheus but for logs. Lightweight — indexes labels, not full text.</div>
+        <div style="margin-top:0.75rem"><span class="tag orange">logs</span><span class="tag teal">efficient</span></div>
+      </div>
+      <div class="card">
+        <div class="card-icon">🚛</div>
+        <div class="card-name">Promtail / Fluent Bit</div>
+        <div class="card-desc">Log shippers — DaemonSets that collect container logs from each node and forward to Loki/Elasticsearch.</div>
+        <div style="margin-top:0.75rem"><span class="tag sky">agent</span><span class="tag violet">daemonset</span></div>
+      </div>
+    </div>
+
+    <h3>// Install the kube-prometheus-stack</h3>
+    <p>The <code>kube-prometheus-stack</code> Helm chart deploys Prometheus, Grafana, Alertmanager, and node/pod exporters in one command — the production standard.</p>
+
+    <div class="code-block">
+      <div class="code-header"><div class="code-dots"><span></span><span></span><span></span></div><div class="code-lang">bash · install prometheus + grafana stack</div></div>
+      <pre><span class="c"># Add the Helm repository</span>
+<span class="cm">helm</span> repo add prometheus-community \
+  https://prometheus-community.github.io/helm-charts
+<span class="cm">helm</span> repo update
+
+<span class="c"># Install the full stack into 'monitoring' namespace</span>
+<span class="cm">helm</span> upgrade --install kube-prom-stack \
+  prometheus-community/kube-prometheus-stack \
+  <span class="fl">--namespace</span> monitoring \
+  <span class="fl">--create-namespace</span> \
+  <span class="fl">--set</span> grafana.adminPassword=<span class="v">YourSecurePass</span> \
+  <span class="fl">--set</span> prometheus.prometheusSpec.retention=<span class="v">30d</span> \
+  <span class="fl">--wait</span>
+
+<span class="c"># Check what was deployed</span>
+<span class="cm">kubectl</span> get pods <span class="fl">-n</span> monitoring
+<span class="out">NAME                                   READY   STATUS
+kube-prom-stack-grafana-xxx            3/3     Running
+kube-prom-stack-prometheus-0           2/2     Running
+kube-prom-stack-alertmanager-0         2/2     Running
+kube-prom-stack-kube-state-metrics-xx  1/1     Running
+kube-prom-stack-prometheus-node-exporter-xxx  1/1  Running (on each node)</span>
+
+<span class="c"># Access Grafana UI</span>
+<span class="cm">kubectl</span> port-forward <span class="fl">-n</span> monitoring svc/kube-prom-stack-grafana 3000:80
+<span class="c"># Open http://localhost:3000 → admin / YourSecurePass</span></pre>
+    </div>
+
+    <h3>// Prometheus Query Language (PromQL)</h3>
+    <p>PromQL is how you query Prometheus data. You'll use it to write Grafana panels and alert rules.</p>
+
+    <div class="code-block">
+      <div class="code-header"><div class="code-dots"><span></span><span></span><span></span></div><div class="code-lang">promql · essential queries</div></div>
+      <pre><span class="c"># CPU usage per pod (as percentage of limit)</span>
+<span class="em">rate(container_cpu_usage_seconds_total{container!=""}[5m])</span>
+<span class="c">  / on(pod) kube_pod_container_resource_limits{resource="cpu"} * 100</span>
+
+<span class="c"># Memory usage per namespace</span>
+<span class="em">sum by (namespace) (container_memory_working_set_bytes{container!=""})</span>
+
+<span class="c"># Pod restart count in the last hour</span>
+<span class="em">increase(kube_pod_container_status_restarts_total[1h]) > 0</span>
+
+<span class="c"># HTTP request rate per service (5xx errors)</span>
+<span class="em">sum(rate(http_requests_total{status=~"5.."}[5m])) by (service)</span>
+
+<span class="c"># Node disk usage %</span>
+<span class="em">(node_filesystem_size_bytes - node_filesystem_free_bytes)</span>
+<span class="em">  / node_filesystem_size_bytes * 100</span>
+
+<span class="c"># Pods not running</span>
+<span class="em">kube_pod_status_phase{phase!="Running",phase!="Succeeded"} == 1</span></pre>
+    </div>
+
+    <h3>// PrometheusRule — Alerting</h3>
+
+    <div class="code-block">
+      <div class="code-header"><div class="code-dots"><span></span><span></span><span></span></div><div class="code-lang">yaml · prometheusrule.yaml — custom alert</div></div>
+      <pre><span class="k">apiVersion</span>: <span class="v">monitoring.coreos.com/v1</span>
+<span class="k">kind</span>: <span class="v">PrometheusRule</span>
+<span class="k">metadata</span>:
+  <span class="k">name</span>: <span class="v">my-app-alerts</span>
+  <span class="k">namespace</span>: <span class="v">monitoring</span>
+  <span class="k">labels</span>:
+    <span class="k">release</span>: <span class="v">kube-prom-stack</span>   <span class="c"># must match for auto-discovery</span>
+<span class="k">spec</span>:
+  <span class="k">groups</span>:
+  - <span class="k">name</span>: <span class="v">my-app.rules</span>
+    <span class="k">rules</span>:
+    - <span class="k">alert</span>: <span class="v">HighErrorRate</span>
+      <span class="k">expr</span>: |
+        sum(rate(http_requests_total{status=~"5..",job="my-app"}[5m]))
+          / sum(rate(http_requests_total{job="my-app"}[5m])) > 0.01
+      <span class="k">for</span>: <span class="v">2m</span>                 <span class="c"># must be true for 2 mins before firing</span>
+      <span class="k">labels</span>:
+        <span class="k">severity</span>: <span class="v">critical</span>
+      <span class="k">annotations</span>:
+        <span class="k">summary</span>: <span class="v">"Error rate {{ $value | humanizePercentage }} in my-app"</span>
+        <span class="k">runbook_url</span>: <span class="v">https://wiki.company.com/runbooks/high-error-rate</span>
+
+    - <span class="k">alert</span>: <span class="v">PodCrashLooping</span>
+      <span class="k">expr</span>: <span class="v">rate(kube_pod_container_status_restarts_total[15m]) * 60 > 1</span>
+      <span class="k">for</span>: <span class="v">5m</span>
+      <span class="k">labels</span>:
+        <span class="k">severity</span>: <span class="v">warning</span>
+      <span class="k">annotations</span>:
+        <span class="k">summary</span>: <span class="v">"Pod {{ $labels.pod }} is crash-looping"</span></pre>
+    </div>
+
+    <h3>// Logging with Loki + Promtail</h3>
+
+    <div class="code-block">
+      <div class="code-header"><div class="code-dots"><span></span><span></span><span></span></div><div class="code-lang">bash · install loki stack</div></div>
+      <pre><span class="cm">helm</span> repo add grafana https://grafana.github.io/helm-charts
+<span class="cm">helm</span> repo update
+
+<span class="cm">helm</span> upgrade --install loki grafana/loki-stack \
+  <span class="fl">--namespace</span> monitoring \
+  <span class="fl">--set</span> grafana.enabled=<span class="hl">false</span> \   <span class="c"># reuse existing Grafana</span>
+  <span class="fl">--set</span> promtail.enabled=<span class="hl">true</span>     <span class="c"># DaemonSet log collector</span>
+
+<span class="c"># In Grafana: add Loki data source → http://loki:3100</span>
+<span class="c"># Then query logs with LogQL:</span>
+
+<span class="c"># All logs from my-app pods in production</span>
+<span class="em">{namespace="production", app="my-app"}</span>
+
+<span class="c"># Filter to error lines only</span>
+<span class="em">{namespace="production"} |= "ERROR"</span>
+
+<span class="c"># Parse JSON logs and filter by field</span>
+<span class="em">{app="my-app"} | json | level="error" | line_format "{{.msg}}"</span></pre>
+    </div>
+  </section>
+
+  <!-- ══════════════════════════════════════════ SECTION 5: AUTOSCALING -->
+  <section id="autoscaling">
+    <div class="section-num">// 05</div>
+    <h2>Auto-Scaling: HPA & VPA</h2>
+    <p>Kubernetes can automatically scale your workloads based on real-time metrics — no more over-provisioning for peak load or under-provisioning for off-peak.</p>
+
+    <div class="card-grid">
+      <div class="card">
+        <div class="card-icon">↔️</div>
+        <div class="card-name">HPA — Horizontal Pod Autoscaler</div>
+        <div class="card-desc">Scales the <strong>number of Pods</strong> based on CPU, memory, or custom metrics. The most common autoscaler in production.</div>
+        <div style="margin-top:0.75rem"><span class="tag teal">scale out/in</span><span class="tag green">pod count</span></div>
+      </div>
+      <div class="card">
+        <div class="card-icon">↕️</div>
+        <div class="card-name">VPA — Vertical Pod Autoscaler</div>
+        <div class="card-desc">Adjusts <strong>CPU/memory requests and limits</strong> of individual containers. Requires pod restart to apply. Good for right-sizing.</div>
+        <div style="margin-top:0.75rem"><span class="tag violet">resize resources</span><span class="tag sky">right-sizing</span></div>
+      </div>
+      <div class="card">
+        <div class="card-icon">🖥️</div>
+        <div class="card-name">Cluster Autoscaler</div>
+        <div class="card-desc">Adds/removes <strong>Nodes</strong> from the cluster when Pods can't be scheduled due to resource constraints. Works with cloud provider node groups.</div>
+        <div style="margin-top:0.75rem"><span class="tag orange">node scaling</span><span class="tag teal">cloud</span></div>
+      </div>
+    </div>
+
+    <h3>// HPA — Horizontal Pod Autoscaler</h3>
+
+    <div class="code-block">
+      <div class="code-header"><div class="code-dots"><span></span><span></span><span></span></div><div class="code-lang">bash + yaml · HPA setup</div></div>
+      <pre><span class="c"># Prerequisites: metrics-server must be installed</span>
+<span class="cm">kubectl</span> apply <span class="fl">-f</span> https://github.com/kubernetes-sigs/metrics-server/releases/latest/download/components.yaml
+
+<span class="c"># Verify it's working</span>
+<span class="cm">kubectl</span> top pods
+<span class="cm">kubectl</span> top nodes
+
+<span class="c"># Quick HPA from command line</span>
+<span class="cm">kubectl</span> autoscale deployment my-app \
+  <span class="fl">--min=2</span> <span class="fl">--max=10</span> <span class="fl">--cpu-percent=60</span></pre>
+    </div>
+
+    <div class="code-block">
+      <div class="code-header"><div class="code-dots"><span></span><span></span><span></span></div><div class="code-lang">yaml · hpa.yaml — full spec with multi-metric</div></div>
+      <pre><span class="k">apiVersion</span>: <span class="v">autoscaling/v2</span>
+<span class="k">kind</span>: <span class="v">HorizontalPodAutoscaler</span>
+<span class="k">metadata</span>:
+  <span class="k">name</span>: <span class="v">my-app-hpa</span>
+<span class="k">spec</span>:
+  <span class="k">scaleTargetRef</span>:
+    <span class="k">apiVersion</span>: <span class="v">apps/v1</span>
+    <span class="k">kind</span>: <span class="v">Deployment</span>
+    <span class="k">name</span>: <span class="v">my-app</span>
+  <span class="k">minReplicas</span>: <span class="n">2</span>
+  <span class="k">maxReplicas</span>: <span class="n">20</span>
+
+  <span class="k">metrics</span>:
+  <span class="c"># Scale on CPU utilization</span>
+  - <span class="k">type</span>: <span class="v">Resource</span>
+    <span class="k">resource</span>:
+      <span class="k">name</span>: <span class="v">cpu</span>
+      <span class="k">target</span>:
+        <span class="k">type</span>: <span class="v">Utilization</span>
+        <span class="k">averageUtilization</span>: <span class="n">60</span>   <span class="c"># target 60% CPU across pods</span>
+
+  <span class="c"># Scale on memory too</span>
+  - <span class="k">type</span>: <span class="v">Resource</span>
+    <span class="k">resource</span>:
+      <span class="k">name</span>: <span class="v">memory</span>
+      <span class="k">target</span>:
+        <span class="k">type</span>: <span class="v">AverageValue</span>
+        <span class="k">averageValue</span>: <span class="v">200Mi</span>
+
+  <span class="k">behavior</span>:
+    <span class="k">scaleDown</span>:
+      <span class="k">stabilizationWindowSeconds</span>: <span class="n">300</span>   <span class="c"># wait 5m before scaling down</span>
+      <span class="k">policies</span>:
+      - <span class="k">type</span>: <span class="v">Pods</span>
+        <span class="k">value</span>: <span class="n">2</span>
+        <span class="k">periodSeconds</span>: <span class="n">60</span>              <span class="c"># remove at most 2 pods per minute</span>
+    <span class="k">scaleUp</span>:
+      <span class="k">stabilizationWindowSeconds</span>: <span class="n">0</span>     <span class="c"># scale up immediately</span>
+      <span class="k">policies</span>:
+      - <span class="k">type</span>: <span class="v">Percent</span>
+        <span class="k">value</span>: <span class="n">100</span>
+        <span class="k">periodSeconds</span>: <span class="n">15</span>             <span class="c"># can double pods every 15s</span></pre>
+    </div>
+
+    <div class="code-block">
+      <div class="code-header"><div class="code-dots"><span></span><span></span><span></span></div><div class="code-lang">bash · watch HPA in action</div></div>
+      <pre><span class="c"># Watch HPA status</span>
+<span class="cm">kubectl</span> get hpa my-app-hpa <span class="fl">-w</span>
+<span class="out">NAME         REFERENCE           TARGETS    MINPODS  MAXPODS  REPLICAS
+my-app-hpa  Deployment/my-app  23%/60%    2        20       2
+my-app-hpa  Deployment/my-app  78%/60%    2        20       4        ← scaling up!
+my-app-hpa  Deployment/my-app  61%/60%    2        20       4</span>
+
+<span class="c"># Simulate load to trigger scaling</span>
+<span class="cm">kubectl</span> run load-gen <span class="fl">--image=busybox --rm -it</span> -- \
+  /bin/sh -c <span class="v">"while true; do wget -q -O- http://my-app; done"</span></pre>
+    </div>
+
+    <h3>// VPA — Vertical Pod Autoscaler</h3>
+
+    <div class="code-block">
+      <div class="code-header"><div class="code-dots"><span></span><span></span><span></span></div><div class="code-lang">yaml · vpa.yaml</div></div>
+      <pre><span class="k">apiVersion</span>: <span class="v">autoscaling.k8s.io/v1</span>
+<span class="k">kind</span>: <span class="v">VerticalPodAutoscaler</span>
+<span class="k">metadata</span>:
+  <span class="k">name</span>: <span class="v">my-app-vpa</span>
+<span class="k">spec</span>:
+  <span class="k">targetRef</span>:
+    <span class="k">apiVersion</span>: <span class="v">apps/v1</span>
+    <span class="k">kind</span>: <span class="v">Deployment</span>
+    <span class="k">name</span>: <span class="v">my-app</span>
+  <span class="k">updatePolicy</span>:
+    <span class="k">updateMode</span>: <span class="v">Auto</span>     <span class="c"># Off | Initial | Recreate | Auto</span>
+  <span class="k">resourcePolicy</span>:
+    <span class="k">containerPolicies</span>:
+    - <span class="k">containerName</span>: <span class="v">'*'</span>
+      <span class="k">minAllowed</span>: { <span class="k">cpu</span>: <span class="v">50m</span>, <span class="k">memory</span>: <span class="v">64Mi</span> }
+      <span class="k">maxAllowed</span>: { <span class="k">cpu</span>: <span class="v">2</span>,   <span class="k">memory</span>: <span class="v">2Gi</span>  }
+
+<span class="c"># Check VPA recommendations (great in 'Off' mode for right-sizing)</span>
+<span class="cm">kubectl</span> describe vpa my-app-vpa
+<span class="out">  Recommendation:
+    Container Recommendations:
+      Container Name: my-app
+        Lower Bound:   cpu: 50m,  memory: 100Mi
+        Target:        cpu: 120m, memory: 230Mi   ← what VPA suggests
+        Upper Bound:   cpu: 500m, memory: 1Gi</span></pre>
+    </div>
+
+    <div class="callout warn">
+      <div class="callout-label">⚠️ HPA + VPA Conflict</div>
+      <p>Don't use HPA on CPU/memory <em>and</em> VPA on the same deployment simultaneously — they will fight. Use HPA for pod count scaling and VPA in <strong>Off</strong> mode for resource recommendations only, then apply manually.</p>
+    </div>
+  </section>
+
+  <!-- ══════════════════════════════════════════ SECTION 6: MULTI-ENV -->
+  <section id="multienv">
+    <div class="section-num">// 06</div>
+    <h2>Multi-Environment Management</h2>
+    <p>Every real organization needs dev, staging, and production environments. Kubernetes gives you multiple strategies — each with different trade-offs.</p>
+
+    <div class="compare">
+      <div class="compare-col sky-t">
+        <div class="compare-col-title">Namespaces (single cluster)</div>
+        <div class="compare-item">Simple — one cluster, multiple namespaces</div>
+        <div class="compare-item">Cheaper — shared control plane & nodes</div>
+        <div class="compare-item">Logical isolation with RBAC + NetworkPolicy</div>
+        <div class="compare-item">Risk: noisy neighbor problems between envs</div>
+        <div class="compare-item">Good for dev/staging on the same cluster</div>
+      </div>
+      <div class="compare-col teal-t">
+        <div class="compare-col-title">Separate Clusters</div>
+        <div class="compare-item">True isolation — blast radius is contained</div>
+        <div class="compare-item">Production has no shared fate with staging</div>
+        <div class="compare-item">Different K8s versions per env possible</div>
+        <div class="compare-item">Higher cost & more operational overhead</div>
+        <div class="compare-item">Industry standard for production</div>
+      </div>
+    </div>
+
+    <h3>// Namespace Strategy</h3>
+
+    <div class="code-block">
+      <div class="code-header"><div class="code-dots"><span></span><span></span><span></span></div><div class="code-lang">bash · namespace-per-environment pattern</div></div>
+      <pre><span class="c"># Create namespaces</span>
+<span class="cm">kubectl</span> create namespace development
+<span class="cm">kubectl</span> create namespace staging
+<span class="cm">kubectl</span> create namespace production
+
+<span class="c"># Label them for policy enforcement</span>
+<span class="cm">kubectl</span> label namespace production env=production tier=prod
+<span class="cm">kubectl</span> label namespace staging    env=staging   tier=nonprod
+<span class="cm">kubectl</span> label namespace development env=dev      tier=nonprod
+
+<span class="c"># Apply different resource quotas per env</span>
+<span class="cm">kubectl</span> apply <span class="fl">-f</span> quota-dev.yaml   <span class="fl">-n</span> development
+<span class="cm">kubectl</span> apply <span class="fl">-f</span> quota-staging.yaml <span class="fl">-n</span> staging
+<span class="cm">kubectl</span> apply <span class="fl">-f</span> quota-prod.yaml  <span class="fl">-n</span> production
+
+<span class="c"># Deploy to each env with different values</span>
+<span class="cm">helm</span> upgrade --install myapp ./chart <span class="fl">-n</span> development <span class="fl">-f</span> values-dev.yaml
+<span class="cm">helm</span> upgrade --install myapp ./chart <span class="fl">-n</span> staging     <span class="fl">-f</span> values-staging.yaml
+<span class="cm">helm</span> upgrade --install myapp ./chart <span class="fl">-n</span> production  <span class="fl">-f</span> values-prod.yaml</pre>
+    </div>
+
+    <h3>// Managing Multiple Cluster Contexts</h3>
+    <p>When working across multiple clusters (dev cluster, staging cluster, prod cluster), <code>kubectl config</code> manages your credentials and context switching.</p>
+
+    <div class="code-block">
+      <div class="code-header"><div class="code-dots"><span></span><span></span><span></span></div><div class="code-lang">bash · kubectl context management</div></div>
+      <pre><span class="c"># List all contexts (clusters you have access to)</span>
+<span class="cm">kubectl</span> config get-contexts
+<span class="out">CURRENT   NAME                    CLUSTER         AUTHINFO     NAMESPACE
+*         prod-us-east-1          prod-cluster    prod-user    production
+          staging-eu-west-1       staging-cluster stg-user     staging
+          dev-local               minikube        minikube</span>
+
+<span class="c"># Switch context</span>
+<span class="cm">kubectl</span> config use-context staging-eu-west-1
+
+<span class="c"># Run a single command in a different context</span>
+<span class="cm">kubectl</span> get pods <span class="fl">--context=prod-us-east-1</span> <span class="fl">-n</span> production
+
+<span class="c"># Set default namespace for current context</span>
+<span class="cm">kubectl</span> config set-context <span class="fl">--current</span> <span class="fl">--namespace=staging</span>
+
+<span class="c"># Install kubectx/kubens for faster switching</span>
+<span class="cm">brew</span> install kubectx
+<span class="cm">kubectx</span> prod-us-east-1          <span class="c"># switch cluster</span>
+<span class="cm">kubens</span> production                <span class="c"># switch namespace</span></pre>
+    </div>
+
+    <h3>// Kustomize — Environment Overlays</h3>
+    <p>Kustomize (built into kubectl) lets you maintain a <strong>base</strong> configuration and apply environment-specific <strong>overlays</strong> — without templating syntax.</p>
+
+    <div class="code-block">
+      <div class="code-header"><div class="code-dots"><span></span><span></span><span></span></div><div class="code-lang">bash · kustomize directory structure</div></div>
+      <pre><span class="out">k8s/
+├── base/
+│   ├── kustomization.yaml    ← lists all base resources
+│   ├── deployment.yaml
+│   └── service.yaml
+└── overlays/
+    ├── staging/
+    │   ├── kustomization.yaml  ← patches on top of base
+    │   └── patch-replicas.yaml  (replicas: 1)
+    └── production/
+        ├── kustomization.yaml
+        └── patch-replicas.yaml  (replicas: 5)</span></pre>
+    </div>
+
+    <div class="code-block">
+      <div class="code-header"><div class="code-dots"><span></span><span></span><span></span></div><div class="code-lang">yaml · overlays/production/kustomization.yaml</div></div>
+      <pre><span class="k">resources</span>:
+  - <span class="v">../../base</span>
+
+<span class="k">images</span>:
+  - <span class="k">name</span>: <span class="v">my-app</span>
+    <span class="k">newTag</span>: <span class="v">v2.3.1</span>   <span class="c"># override image tag</span>
+
+<span class="k">patches</span>:
+  - <span class="k">patch</span>: |-
+      <span class="k">- op</span>: <span class="v">replace</span>
+        <span class="k">path</span>: <span class="v">/spec/replicas</span>
+        <span class="k">value</span>: <span class="n">5</span>
+    <span class="k">target</span>:
+      <span class="k">kind</span>: <span class="v">Deployment</span>
+      <span class="k">name</span>: <span class="v">my-app</span>
+
+<span class="c"># Apply directly</span>
+<span class="cm">kubectl</span> apply <span class="fl">-k</span> overlays/production
+<span class="cm">kubectl</span> diff <span class="fl">-k</span> overlays/production    <span class="c"># preview changes</span></pre>
+    </div>
+  </section>
+
+  <!-- ══════════════════════════════════════════ SECTION 7: MANAGED K8S -->
+  <section id="managed">
+    <div class="section-num">// 07</div>
+    <h2>Managed Kubernetes</h2>
+    <p>Running your own K8s control plane in production is hard. The major cloud providers handle control plane management, upgrades, and HA for you — you only manage your worker nodes and workloads.</p>
+
+    <div class="cloud-grid">
+      <div class="cloud-card aws">
+        <div class="cloud-card-header">☁️ AWS EKS</div>
+        <div class="cloud-row"><span class="cloud-label">Full Name</span><span class="cloud-val">Elastic Kubernetes Service</span></div>
+        <div class="cloud-row"><span class="cloud-label">Node Groups</span><span class="cloud-val">Managed, Self-managed, or Fargate (serverless)</span></div>
+        <div class="cloud-row"><span class="cloud-label">Auth</span><span class="cloud-val">IAM roles mapped to K8s RBAC (aws-auth ConfigMap)</span></div>
+        <div class="cloud-row"><span class="cloud-label">CLI</span><span class="cloud-val">eksctl, aws eks</span></div>
+        <div class="cloud-row"><span class="cloud-label">Storage</span><span class="cloud-val">EBS (block), EFS (file), S3 (object)</span></div>
+        <div class="cloud-row"><span class="cloud-label">LB</span><span class="cloud-val">AWS Load Balancer Controller (ALB/NLB)</span></div>
+      </div>
+      <div class="cloud-card gcp">
+        <div class="cloud-card-header">☁️ GCP GKE</div>
+        <div class="cloud-row"><span class="cloud-label">Full Name</span><span class="cloud-val">Google Kubernetes Engine</span></div>
+        <div class="cloud-row"><span class="cloud-label">Node Groups</span><span class="cloud-val">Node Pools or Autopilot (fully managed)</span></div>
+        <div class="cloud-row"><span class="cloud-label">Auth</span><span class="cloud-val">Workload Identity — no service account keys</span></div>
+        <div class="cloud-row"><span class="cloud-label">CLI</span><span class="cloud-val">gcloud container clusters</span></div>
+        <div class="cloud-row"><span class="cloud-label">Storage</span><span class="cloud-val">Persistent Disk, Filestore, Cloud Storage FUSE</span></div>
+        <div class="cloud-row"><span class="cloud-label">LB</span><span class="cloud-val">GCP Load Balancer (Global HTTP LB via Ingress)</span></div>
+      </div>
+      <div class="cloud-card azure">
+        <div class="cloud-card-header">☁️ Azure AKS</div>
+        <div class="cloud-row"><span class="cloud-label">Full Name</span><span class="cloud-val">Azure Kubernetes Service</span></div>
+        <div class="cloud-row"><span class="cloud-label">Node Groups</span><span class="cloud-val">Node Pools (System + User) or Virtual Nodes</span></div>
+        <div class="cloud-row"><span class="cloud-label">Auth</span><span class="cloud-val">Azure AD + Entra Workload Identity</span></div>
+        <div class="cloud-row"><span class="cloud-label">CLI</span><span class="cloud-val">az aks</span></div>
+        <div class="cloud-row"><span class="cloud-label">Storage</span><span class="cloud-val">Azure Disk, Azure Files, Blob NFS</span></div>
+        <div class="cloud-row"><span class="cloud-label">LB</span><span class="cloud-val">Azure Load Balancer + Application Gateway Ingress</span></div>
+      </div>
+    </div>
+
+    <h3>// Getting Started with EKS</h3>
+
+    <div class="code-block">
+      <div class="code-header"><div class="code-dots"><span></span><span></span><span></span></div><div class="code-lang">bash · create EKS cluster with eksctl</div></div>
+      <pre><span class="c"># Install eksctl</span>
+<span class="cm">brew</span> install eksctl
+
+<span class="c"># Create cluster (takes ~15 minutes)</span>
+<span class="cm">eksctl</span> create cluster \
+  <span class="fl">--name</span> my-cluster \
+  <span class="fl">--region</span> us-east-1 \
+  <span class="fl">--node-type</span> t3.medium \
+  <span class="fl">--nodes-min</span> 2 \
+  <span class="fl">--nodes-max</span> 10 \
+  <span class="fl">--managed</span>              <span class="c"># AWS-managed node group</span>
+
+<span class="c"># Update kubeconfig to use new cluster</span>
+<span class="cm">aws</span> eks update-kubeconfig <span class="fl">--name</span> my-cluster <span class="fl">--region</span> us-east-1
+
+<span class="c"># Verify</span>
+<span class="cm">kubectl</span> get nodes
+<span class="out">NAME                          STATUS   ROLES    AGE   VERSION
+ip-10-0-1-45.ec2.internal    Ready    <none>   5m    v1.29.3</span>
+
+<span class="c"># Enable Cluster Autoscaler</span>
+<span class="cm">eksctl</span> create iamserviceaccount \
+  <span class="fl">--name</span> cluster-autoscaler \
+  <span class="fl">--namespace</span> kube-system \
+  <span class="fl">--cluster</span> my-cluster \
+  <span class="fl">--attach-policy-arn</span> arn:aws:iam::aws:policy/AutoScalingFullAccess \
+  <span class="fl">--approve</span></pre>
+    </div>
+
+    <h3>// Getting Started with GKE</h3>
+
+    <div class="code-block">
+      <div class="code-header"><div class="code-dots"><span></span><span></span><span></span></div><div class="code-lang">bash · create GKE cluster</div></div>
+      <pre><span class="c"># Create an Autopilot cluster (Google manages nodes for you)</span>
+<span class="cm">gcloud</span> container clusters create-auto my-cluster \
+  <span class="fl">--region</span> us-central1 \
+  <span class="fl">--project</span> my-project-id
+
+<span class="c"># Or a Standard cluster with autoscaling</span>
+<span class="cm">gcloud</span> container clusters create my-cluster \
+  <span class="fl">--zone</span> us-central1-a \
+  <span class="fl">--num-nodes</span> 3 \
+  <span class="fl">--enable-autoscaling \
+  --min-nodes</span> 2 <span class="fl">--max-nodes</span> 10 \
+  <span class="fl">--machine-type</span> e2-standard-4 \
+  <span class="fl">--workload-pool</span> my-project-id.svc.id.goog
+
+<span class="c"># Get credentials</span>
+<span class="cm">gcloud</span> container clusters get-credentials my-cluster <span class="fl">--zone</span> us-central1-a</pre>
+    </div>
+
+    <h3>// Getting Started with AKS</h3>
+
+    <div class="code-block">
+      <div class="code-header"><div class="code-dots"><span></span><span></span><span></span></div><div class="code-lang">bash · create AKS cluster</div></div>
+      <pre><span class="c"># Create resource group</span>
+<span class="cm">az</span> group create <span class="fl">--name</span> myRG <span class="fl">--location</span> eastus
+
+<span class="c"># Create AKS cluster</span>
+<span class="cm">az</span> aks create \
+  <span class="fl">--resource-group</span> myRG \
+  <span class="fl">--name</span> my-cluster \
+  <span class="fl">--node-count</span> 3 \
+  <span class="fl">--node-vm-size</span> Standard_D4s_v3 \
+  <span class="fl">--enable-cluster-autoscaler</span> \
+  <span class="fl">--min-count</span> 2 <span class="fl">--max-count</span> 10 \
+  <span class="fl">--enable-workload-identity</span> \
+  <span class="fl">--enable-oidc-issuer</span>
+
+<span class="c"># Get credentials</span>
+<span class="cm">az</span> aks get-credentials <span class="fl">--resource-group</span> myRG <span class="fl">--name</span> my-cluster</pre>
+    </div>
+
+    <div class="callout info">
+      <div class="callout-label">💰 Cost Tip</div>
+      <p>For learning, use <strong>Spot/Preemptible/Spot instances</strong> for non-production node groups — up to 90% cheaper. EKS calls them Spot, GKE calls them Spot VMs, AKS calls them Spot node pools. Just ensure your workloads tolerate eviction.</p>
+    </div>
+  </section>
+
+  <!-- ══════════════════════════════════════════ SECTION 8: LAB -->
+  <section id="hands-on">
+    <div class="section-num">// 08</div>
+    <h2>Hands-On Lab</h2>
+    <p>Six exercises to apply everything from Stage 4. These build on each other — do them in order.</p>
+
+    <div class="steps">
+
+      <div class="step">
+        <div class="step-num">1</div>
+        <div class="step-content">
+          <h4>Create and Deploy a Helm Chart</h4>
+          <p>Scaffold a chart, customise values, and deploy to Minikube.</p>
+          <div class="code-block" style="margin-top:0.75rem">
+            <div class="code-header"><div class="code-dots"><span></span><span></span><span></span></div><div class="code-lang">bash</div></div>
+            <pre><span class="c"># Scaffold chart</span>
+<span class="cm">helm</span> create my-webserver
+<span class="cm">cd</span> my-webserver
+
+<span class="c"># Lint and render templates before installing</span>
+<span class="cm">helm</span> lint .
+<span class="cm">helm</span> template my-release . <span class="fl">--set</span> replicaCount=3
+
+<span class="c"># Install to Minikube</span>
+<span class="cm">helm</span> install my-release . \
+  <span class="fl">--set</span> replicaCount=3 \
+  <span class="fl">--set</span> service.type=NodePort
+
+<span class="c"># Verify</span>
+<span class="cm">helm</span> status my-release
+<span class="cm">kubectl</span> get all
+
+<span class="c"># Upgrade (bump replicas)</span>
+<span class="cm">helm</span> upgrade my-release . <span class="fl">--set</span> replicaCount=5
+<span class="cm">helm</span> history my-release
+
+<span class="c"># Rollback</span>
+<span class="cm">helm</span> rollback my-release 1</pre>
+          </div>
+        </div>
+      </div>
+
+      <div class="step">
+        <div class="step-num">2</div>
+        <div class="step-content">
+          <h4>Install ArgoCD and Connect a Repo</h4>
+          <p>Install ArgoCD and deploy an application declaratively via Git.</p>
+          <div class="code-block" style="margin-top:0.75rem">
+            <div class="code-header"><div class="code-dots"><span></span><span></span><span></span></div><div class="code-lang">bash</div></div>
+            <pre><span class="c"># Install ArgoCD</span>
+<span class="cm">kubectl</span> create namespace argocd
+<span class="cm">kubectl</span> apply <span class="fl">-n</span> argocd \
+  <span class="fl">-f</span> https://raw.githubusercontent.com/argoproj/argo-cd/stable/manifests/install.yaml
+<span class="cm">kubectl</span> wait pod <span class="fl">-l</span> app.kubernetes.io/name=argocd-server \
+  <span class="fl">-n</span> argocd <span class="fl">--for=condition=Ready --timeout=120s</span>
+
+<span class="c"># Access UI</span>
+<span class="cm">kubectl</span> port-forward svc/argocd-server <span class="fl">-n</span> argocd 8080:443 &
+<span class="cm">kubectl</span> <span class="fl">-n</span> argocd get secret argocd-initial-admin-secret \
+  <span class="fl">-o</span> jsonpath=<span class="v">"{.data.password}"</span> | base64 <span class="fl">-d</span>
+
+<span class="c"># Deploy a sample app from public repo</span>
+<span class="cm">kubectl</span> apply <span class="fl">-f</span> - &lt;&lt;EOF
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: guestbook
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/argoproj/argocd-example-apps
+    path: guestbook
+    targetRevision: HEAD
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: guestbook
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions: [CreateNamespace=true]
+EOF
+
+<span class="cm">kubectl</span> get app guestbook <span class="fl">-n</span> argocd</pre>
+          </div>
+        </div>
+      </div>
+
+      <div class="step">
+        <div class="step-num">3</div>
+        <div class="step-content">
+          <h4>Deploy Prometheus + Grafana</h4>
+          <p>Install the monitoring stack and explore a dashboard.</p>
+          <div class="code-block" style="margin-top:0.75rem">
+            <div class="code-header"><div class="code-dots"><span></span><span></span><span></span></div><div class="code-lang">bash</div></div>
+            <pre><span class="cm">helm</span> repo add prometheus-community \
+  https://prometheus-community.github.io/helm-charts
+<span class="cm">helm</span> repo update
+
+<span class="cm">helm</span> upgrade --install monitoring \
+  prometheus-community/kube-prometheus-stack \
+  <span class="fl">--namespace</span> monitoring <span class="fl">--create-namespace</span> \
+  <span class="fl">--set</span> grafana.adminPassword=admin123 \
+  <span class="fl">--wait</span>
+
+<span class="c"># Open Grafana</span>
+<span class="cm">kubectl</span> port-forward <span class="fl">-n</span> monitoring \
+  svc/monitoring-grafana 3000:80 &
+
+<span class="c"># Browse to http://localhost:3000 (admin/admin123)
+# Explore: Dashboards → Kubernetes → Compute Resources → Cluster</span>
+
+<span class="c"># Query Prometheus directly</span>
+<span class="cm">kubectl</span> port-forward <span class="fl">-n</span> monitoring \
+  svc/monitoring-kube-prometheus-prometheus 9090:9090 &
+<span class="c"># Browse to http://localhost:9090 and try PromQL queries</span></pre>
+          </div>
+        </div>
+      </div>
+
+      <div class="step">
+        <div class="step-num">4</div>
+        <div class="step-content">
+          <h4>Configure HPA and Trigger It</h4>
+          <p>Set up autoscaling and generate load to watch it in action.</p>
+          <div class="code-block" style="margin-top:0.75rem">
+            <div class="code-header"><div class="code-dots"><span></span><span></span><span></span></div><div class="code-lang">bash</div></div>
+            <pre><span class="c"># Install metrics-server</span>
+<span class="cm">kubectl</span> apply <span class="fl">-f</span> \
+  https://github.com/kubernetes-sigs/metrics-server/releases/latest/download/components.yaml
+
+<span class="c"># Deploy a CPU-intensive app</span>
+<span class="cm">kubectl</span> create deployment php-apache \
+  <span class="fl">--image=registry.k8s.io/hpa-example</span>
+<span class="cm">kubectl</span> set resources deployment php-apache \
+  <span class="fl">--requests=cpu=200m</span>
+<span class="cm">kubectl</span> expose deployment php-apache <span class="fl">--port=80</span>
+
+<span class="c"># Create HPA</span>
+<span class="cm">kubectl</span> autoscale deployment php-apache \
+  <span class="fl">--cpu-percent=50</span> <span class="fl">--min=1</span> <span class="fl">--max=10</span>
+
+<span class="c"># Terminal 1: watch HPA</span>
+<span class="cm">kubectl</span> get hpa <span class="fl">-w</span>
+
+<span class="c"># Terminal 2: generate load</span>
+<span class="cm">kubectl</span> run loader <span class="fl">--image=busybox --rm -it</span> \
+  -- /bin/sh -c <span class="v">"while true; do wget -q -O- http://php-apache; done"</span></pre>
+          </div>
+        </div>
+      </div>
+
+      <div class="step">
+        <div class="step-num">5</div>
+        <div class="step-content">
+          <h4>Multi-Environment with Kustomize</h4>
+          <p>Create base + overlay directories and apply environment-specific configs.</p>
+          <div class="code-block" style="margin-top:0.75rem">
+            <div class="code-header"><div class="code-dots"><span></span><span></span><span></span></div><div class="code-lang">bash</div></div>
+            <pre><span class="cm">mkdir</span> <span class="fl">-p</span> k8s/{base,overlays/{dev,prod}}
+
+<span class="c"># Base deployment</span>
+<span class="cm">cat</span> &gt; k8s/base/kustomization.yaml &lt;&lt;<span class="v">EOF
+resources:
+  - deployment.yaml
+  - service.yaml
+EOF</span>
+
+<span class="c"># Dev overlay: 1 replica</span>
+<span class="cm">cat</span> &gt; k8s/overlays/dev/kustomization.yaml &lt;&lt;<span class="v">EOF
+resources: ["../../base"]
+patches:
+  - patch: |-
+      - op: replace
+        path: /spec/replicas
+        value: 1
+    target: {kind: Deployment, name: my-app}
+EOF</span>
+
+<span class="c"># Preview diff between dev and prod</span>
+<span class="cm">kubectl</span> diff <span class="fl">-k</span> k8s/overlays/dev
+<span class="cm">kubectl</span> apply <span class="fl">-k</span> k8s/overlays/dev <span class="fl">-n</span> development</pre>
+          </div>
+        </div>
+      </div>
+
+      <div class="step">
+        <div class="step-num">6</div>
+        <div class="step-content">
+          <h4>Write a GitHub Actions Deploy Pipeline</h4>
+          <p>Create a workflow file that builds an image and deploys via Helm on push to main.</p>
+          <div class="code-block" style="margin-top:0.75rem">
+            <div class="code-header"><div class="code-dots"><span></span><span></span><span></span></div><div class="code-lang">bash</div></div>
+            <pre><span class="cm">mkdir</span> <span class="fl">-p</span> .github/workflows
+
+<span class="c"># Create the workflow file from the template in section 02</span>
+<span class="c"># Key things to configure:</span>
+<span class="out">1. Add KUBECONFIG secret to GitHub repo settings
+2. Create 'staging' and 'production' environments
+3. Add required reviewers to the 'production' environment
+4. Push to main and watch the Actions tab</span>
+
+<span class="c"># Validate workflow syntax locally with act</span>
+<span class="cm">brew</span> install act
+<span class="cm">act</span> push <span class="fl">--dryrun</span>    <span class="c"># preview what would run</span>
+<span class="cm">act</span> push             <span class="c"># run locally against Docker</span></pre>
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- QUIZ -->
+    <div class="quiz">
+      <div class="quiz-title">// Stage 4 Knowledge Check</div>
+
+      <div class="quiz-q">
+        <p>1. What is the difference between a Helm <em>Chart</em> and a Helm <em>Release</em>?</p>
+        <div class="quiz-options">
+          <button class="quiz-opt" onclick="answer(this,false)">They are the same thing — just different terminology</button>
+          <button class="quiz-opt" onclick="answer(this,true)">A Chart is a template package; a Release is a specific installed instance of that Chart in a cluster</button>
+          <button class="quiz-opt" onclick="answer(this,false)">A Release is the source code, a Chart is the compiled binary</button>
+          <button class="quiz-opt" onclick="answer(this,false)">A Chart is namespace-scoped, a Release is cluster-scoped</button>
+        </div>
+      </div>
+
+      <div class="quiz-q">
+        <p>2. In GitOps with ArgoCD, where does the deploy authority live?</p>
+        <div class="quiz-options">
+          <button class="quiz-opt" onclick="answer(this,false)">In the CI pipeline — it pushes manifests to the cluster</button>
+          <button class="quiz-opt" onclick="answer(this,true)">In the cluster itself — ArgoCD pulls desired state from Git and reconciles</button>
+          <button class="quiz-opt" onclick="answer(this,false)">In a dedicated deployment server external to both Git and the cluster</button>
+          <button class="quiz-opt" onclick="answer(this,false)">In the developer's local kubectl context</button>
+        </div>
+      </div>
+
+      <div class="quiz-q">
+        <p>3. What does the HPA <code>stabilizationWindowSeconds</code> on scale-down do?</p>
+        <div class="quiz-options">
+          <button class="quiz-opt" onclick="answer(this,false)">Sets the maximum time to wait before forcibly killing pods</button>
+          <button class="quiz-opt" onclick="answer(this,false)">Defines how long to wait before the first HPA check runs</button>
+          <button class="quiz-opt" onclick="answer(this,true)">Prevents flapping — the HPA waits this many seconds before acting on a scale-down decision</button>
+          <button class="quiz-opt" onclick="answer(this,false)">Limits how fast pods can be added during scale-up</button>
+        </div>
+      </div>
+
+      <div class="quiz-q">
+        <p>4. What is the key advantage of using Kustomize <em>overlays</em> vs separate YAML files per environment?</p>
+        <div class="quiz-options">
+          <button class="quiz-opt" onclick="answer(this,false)">Kustomize is faster to apply than plain kubectl</button>
+          <button class="quiz-opt" onclick="answer(this,true)">You maintain one base and only define the <em>differences</em> per environment — no duplication</button>
+          <button class="quiz-opt" onclick="answer(this,false)">Overlays support secret encryption that plain YAML doesn't</button>
+          <button class="quiz-opt" onclick="answer(this,false)">Kustomize automatically detects which environment it's running in</button>
+        </div>
+      </div>
+
+      <div class="quiz-q">
+        <p>5. Why should you NOT use the <code>latest</code> tag for container images in production CI/CD?</p>
+        <div class="quiz-options">
+          <button class="quiz-opt" onclick="answer(this,false)">Kubernetes doesn't support the latest tag in Deployments</button>
+          <button class="quiz-opt" onclick="answer(this,false)">latest images are automatically deleted by Docker Hub after 30 days</button>
+          <button class="quiz-opt" onclick="answer(this,true)">latest is mutable — you can't deterministically roll back or trace which code is running. Use the git commit SHA instead</button>
+          <button class="quiz-opt" onclick="answer(this,false)">latest images skip the container registry cache, slowing down deployments</button>
+        </div>
+      </div>
+
+    </div>
+
+    <div class="callout teal">
+      <div class="callout-label">🎯 What's Next — Stage 5</div>
+      <p>You're ready for <strong>Advanced Kubernetes</strong>: building clusters from scratch with <strong>kubeadm</strong>, writing <strong>Custom Resource Definitions (CRDs) and Operators</strong>, service mesh with <strong>Istio</strong>, advanced cluster security with <strong>OPA/Gatekeeper</strong>, etcd backup/restore, and <strong>multi-cluster management</strong>.</p>
+    </div>
+
+  </section>
+
+</div>
+</main>
+
+<footer>
+  <div class="container">
+    <div class="footer-text">KUBERNETES CRASH COURSE · STAGE 4 · REAL-WORLD OPERATIONS</div>
+    <div style="margin-top:0.5rem;font-family:'JetBrains Mono',monospace;font-size:0.65rem;color:#374151">
+      helm.sh &nbsp;·&nbsp; argo-cd.readthedocs.io &nbsp;·&nbsp; prometheus.io &nbsp;·&nbsp; grafana.com
+    </div>
+  </div>
+</footer>
+
+<script>
+  // Progress bar
+  window.addEventListener('scroll', () => {
+    const docH = document.documentElement.scrollHeight - window.innerHeight;
+    document.getElementById('progress-bar').style.width = (window.scrollY / docH * 100) + '%';
+  });
+
+  // Section fade-in
+  const observer = new IntersectionObserver(entries => {
+    entries.forEach(e => { if (e.isIntersecting) e.target.classList.add('visible'); });
+  }, { threshold: 0.05 });
+  document.querySelectorAll('section').forEach(s => observer.observe(s));
+
+  // Quiz
+  function answer(btn, correct) {
+    const group = btn.closest('.quiz-options');
+    if (group.dataset.answered) return;
+    group.dataset.answered = 'true';
+    btn.classList.add(correct ? 'correct' : 'wrong');
+    group.querySelectorAll('.quiz-opt').forEach(b => {
+      b.style.pointerEvents = 'none';
+      if (!correct && b !== btn) b.style.opacity = '0.35';
+    });
+  }
+</script>
+</body>
+</html>
