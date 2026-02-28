@@ -1199,6 +1199,53 @@ deployment "webapp" successfully rolled out</span></pre>
       </div>
     </div>
 
+    <h3>// Cleanup</h3>
+    <p>When you're done experimenting, remove all the resources created during this lab.</p>
+
+    <div class="steps">
+      <div class="step">
+        <div class="step-num">6</div>
+        <div class="step-content">
+          <h4>Delete Lab Resources</h4>
+          <p>Remove the Service, Deployment (which also removes its ReplicaSet and all Pods), and ConfigMap.</p>
+          <div class="code-block" style="margin-top:0.75rem">
+            <div class="code-header"><div class="code-dots"><span></span><span></span><span></span></div><div class="code-lang">bash</div></div>
+            <pre><span class="cmd">kubectl</span> delete service webapp
+<span class="cmd">kubectl</span> delete deployment webapp
+<span class="cmd">kubectl</span> delete configmap app-cfg</pre>
+          </div>
+        </div>
+      </div>
+
+      <div class="step">
+        <div class="step-num">7</div>
+        <div class="step-content">
+          <h4>Verify Everything Is Gone</h4>
+          <p>Confirm only default cluster resources remain.</p>
+          <div class="code-block" style="margin-top:0.75rem">
+            <div class="code-header"><div class="code-dots"><span></span><span></span><span></span></div><div class="code-lang">bash</div></div>
+            <pre><span class="cmd">kubectl</span> get all
+<span class="cmd">kubectl</span> get configmaps
+<span class="cmt"># You should only see the default "kubernetes" service</span>
+<span class="cmt"># and the "kube-root-ca.crt" configmap</span></pre>
+          </div>
+        </div>
+      </div>
+
+      <div class="step">
+        <div class="step-num">8</div>
+        <div class="step-content">
+          <h4>Stop Minikube <span style="font-size:0.8rem;color:var(--muted);font-weight:400">(optional)</span></h4>
+          <p>Free up system resources when you're done for the day.</p>
+          <div class="code-block" style="margin-top:0.75rem">
+            <div class="code-header"><div class="code-dots"><span></span><span></span><span></span></div><div class="code-lang">bash</div></div>
+            <pre><span class="cmd">minikube</span> stop           <span class="cmt"># pause the cluster (state preserved)</span>
+<span class="cmd">minikube</span> delete         <span class="cmt"># fully remove cluster and all data</span></pre>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <div class="callout tip">
       <div class="callout-label">🎯 What's Next</div>
       <p>You're ready for <strong>Stage 3</strong>: Scheduling, Storage, Networking, StatefulSets, and RBAC. Keep your Minikube cluster running and experiment constantly — that's how it sticks.</p>
