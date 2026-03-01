@@ -1081,13 +1081,22 @@ alias kl='kubectl logs'
       <div class="step">
         <div class="step-num">1</div>
         <div class="step-content">
-          <h4>Create a Deployment</h4>
-          <p>Deploy a simple nginx app with 3 replicas.</p>
+          <h4>Create a Namespace</h4>
+          <p>Namespaces isolate resources into logical groups. We'll create a dedicated <code style="font-family:'JetBrains Mono',monospace;color:var(--accent3)">lab</code> namespace for all our work — this keeps things organized and makes cleanup a single command.</p>
           <div class="code-block" style="margin-top:0.75rem">
             <div class="code-header"><div class="code-dots"><span></span><span></span><span></span></div><div class="code-lang">bash</div></div>
-            <pre><span class="cmd">kubectl</span> create deployment webapp <span class="flag">--image=nginx:1.25</span> <span class="flag">--replicas=3</span>
-<span class="cmd">kubectl</span> get deployments
-<span class="cmd">kubectl</span> get pods</pre>
+            <pre><span class="cmd">kubectl</span> create namespace lab
+
+<span class="cmt"># Verify it exists</span>
+<span class="cmd">kubectl</span> get namespaces
+<span class="out">NAME              STATUS   AGE
+default           Active   10m
+kube-system       Active   10m
+lab               Active   5s</span></pre>
+          </div>
+          <div class="callout info" style="margin-top:0.75rem">
+            <div class="callout-label">📋 Namespace Basics</div>
+            <p>By default, <code style="font-family:'JetBrains Mono',monospace;color:var(--accent3)">kubectl</code> operates in the <code style="font-family:'JetBrains Mono',monospace;color:var(--accent3)">default</code> namespace. We'll use <code style="font-family:'JetBrains Mono',monospace;color:var(--accent3)">-n lab</code> on every command to target our namespace. This is the same pattern you'll use in production to separate teams, environments, and applications.</p>
           </div>
         </div>
       </div>
@@ -1095,12 +1104,13 @@ alias kl='kubectl logs'
       <div class="step">
         <div class="step-num">2</div>
         <div class="step-content">
-          <h4>Expose it with a Service</h4>
-          <p>Create a NodePort service to access it from your browser.</p>
+          <h4>Create a Deployment</h4>
+          <p>Deploy a simple nginx app with 3 replicas.</p>
           <div class="code-block" style="margin-top:0.75rem">
             <div class="code-header"><div class="code-dots"><span></span><span></span><span></span></div><div class="code-lang">bash</div></div>
-            <pre><span class="cmd">kubectl</span> expose deployment webapp <span class="flag">--port=80</span> <span class="flag">--type=NodePort</span>
-<span class="cmd">minikube</span> service webapp <span class="flag">--url</span>   <span class="cmt"># opens in browser</span></pre>
+            <pre><span class="cmd">kubectl</span> create deployment webapp <span class="flag">--image=nginx:1.25</span> <span class="flag">--replicas=3</span> <span class="flag">-n</span> lab
+<span class="cmd">kubectl</span> get deployments <span class="flag">-n</span> lab
+<span class="cmd">kubectl</span> get pods <span class="flag">-n</span> lab</pre>
           </div>
         </div>
       </div>
@@ -1108,14 +1118,12 @@ alias kl='kubectl logs'
       <div class="step">
         <div class="step-num">3</div>
         <div class="step-content">
-          <h4>Simulate a Rolling Update</h4>
-          <p>Update the image and watch K8s roll it out without downtime.</p>
+          <h4>Expose it with a Service</h4>
+          <p>Create a NodePort service to access it from your browser.</p>
           <div class="code-block" style="margin-top:0.75rem">
             <div class="code-header"><div class="code-dots"><span></span><span></span><span></span></div><div class="code-lang">bash</div></div>
-            <pre><span class="cmd">kubectl</span> set image deployment/webapp nginx=nginx:alpine
-<span class="cmd">kubectl</span> rollout status deployment/webapp
-<span class="out">Waiting for deployment "webapp" rollout to finish...
-deployment "webapp" successfully rolled out</span></pre>
+            <pre><span class="cmd">kubectl</span> expose deployment webapp <span class="flag">--port=80</span> <span class="flag">--type=NodePort</span> <span class="flag">-n</span> lab
+<span class="cmd">minikube</span> service webapp <span class="flag">-n</span> lab <span class="flag">--url</span>   <span class="cmt"># opens in browser</span></pre>
           </div>
         </div>
       </div>
@@ -1123,17 +1131,14 @@ deployment "webapp" successfully rolled out</span></pre>
       <div class="step">
         <div class="step-num">4</div>
         <div class="step-content">
-          <h4>Test Self-Healing</h4>
-          <p>Delete a pod and watch it get recreated automatically.</p>
+          <h4>Simulate a Rolling Update</h4>
+          <p>Update the image and watch K8s roll it out without downtime.</p>
           <div class="code-block" style="margin-top:0.75rem">
             <div class="code-header"><div class="code-dots"><span></span><span></span><span></span></div><div class="code-lang">bash</div></div>
-            <pre><span class="cmt"># In terminal 1: watch pods</span>
-<span class="cmd">kubectl</span> get pods <span class="flag">-w</span>
-
-<span class="cmt"># In terminal 2: delete a pod</span>
-<span class="cmd">kubectl</span> delete pod &lt;pod-name&gt;
-
-<span class="cmt"># Watch a new one spin up instantly in terminal 1!</span></pre>
+            <pre><span class="cmd">kubectl</span> set image deployment/webapp nginx=nginx:alpine <span class="flag">-n</span> lab
+<span class="cmd">kubectl</span> rollout status deployment/webapp <span class="flag">-n</span> lab
+<span class="out">Waiting for deployment "webapp" rollout to finish...
+deployment "webapp" successfully rolled out</span></pre>
           </div>
         </div>
       </div>
@@ -1141,13 +1146,31 @@ deployment "webapp" successfully rolled out</span></pre>
       <div class="step">
         <div class="step-num">5</div>
         <div class="step-content">
+          <h4>Test Self-Healing</h4>
+          <p>Delete a pod and watch it get recreated automatically.</p>
+          <div class="code-block" style="margin-top:0.75rem">
+            <div class="code-header"><div class="code-dots"><span></span><span></span><span></span></div><div class="code-lang">bash</div></div>
+            <pre><span class="cmt"># In terminal 1: watch pods</span>
+<span class="cmd">kubectl</span> get pods <span class="flag">-n</span> lab <span class="flag">-w</span>
+
+<span class="cmt"># In terminal 2: delete a pod</span>
+<span class="cmd">kubectl</span> delete pod &lt;pod-name&gt; <span class="flag">-n</span> lab
+
+<span class="cmt"># Watch a new one spin up instantly in terminal 1!</span></pre>
+          </div>
+        </div>
+      </div>
+
+      <div class="step">
+        <div class="step-num">6</div>
+        <div class="step-content">
           <h4>Add a ConfigMap</h4>
           <p>Create a config and mount it into the deployment.</p>
           <div class="code-block" style="margin-top:0.75rem">
             <div class="code-header"><div class="code-dots"><span></span><span></span><span></span></div><div class="code-lang">bash</div></div>
-            <pre><span class="cmd">kubectl</span> create configmap app-cfg <span class="flag">--from-literal=ENV=production</span>
-<span class="cmd">kubectl</span> set env deployment/webapp <span class="flag">--from=configmap/app-cfg</span>
-<span class="cmd">kubectl</span> exec <span class="flag">-it</span> &lt;pod&gt; -- env | grep ENV
+            <pre><span class="cmd">kubectl</span> create configmap app-cfg <span class="flag">--from-literal=ENV=production</span> <span class="flag">-n</span> lab
+<span class="cmd">kubectl</span> set env deployment/webapp <span class="flag">--from=configmap/app-cfg</span> <span class="flag">-n</span> lab
+<span class="cmd">kubectl</span> exec <span class="flag">-it</span> &lt;pod&gt; <span class="flag">-n</span> lab -- env | grep ENV
 <span class="out">ENV=production</span></pre>
           </div>
         </div>
@@ -1200,34 +1223,21 @@ deployment "webapp" successfully rolled out</span></pre>
     </div>
 
     <h3>// Cleanup</h3>
-    <p>When you're done experimenting, remove all the resources created during this lab.</p>
+    <p>When you're done experimenting, clean up everything with a single command — this is the benefit of using a dedicated namespace.</p>
 
     <div class="steps">
       <div class="step">
-        <div class="step-num">6</div>
-        <div class="step-content">
-          <h4>Delete Lab Resources</h4>
-          <p>Remove the Service, Deployment (which also removes its ReplicaSet and all Pods), and ConfigMap.</p>
-          <div class="code-block" style="margin-top:0.75rem">
-            <div class="code-header"><div class="code-dots"><span></span><span></span><span></span></div><div class="code-lang">bash</div></div>
-            <pre><span class="cmd">kubectl</span> delete service webapp
-<span class="cmd">kubectl</span> delete deployment webapp
-<span class="cmd">kubectl</span> delete configmap app-cfg</pre>
-          </div>
-        </div>
-      </div>
-
-      <div class="step">
         <div class="step-num">7</div>
         <div class="step-content">
-          <h4>Verify Everything Is Gone</h4>
-          <p>Confirm only default cluster resources remain.</p>
+          <h4>Delete the Namespace</h4>
+          <p>Deleting the namespace removes <strong>all resources inside it</strong> — Deployments, Services, ConfigMaps, Pods, ReplicaSets — everything in one go.</p>
           <div class="code-block" style="margin-top:0.75rem">
             <div class="code-header"><div class="code-dots"><span></span><span></span><span></span></div><div class="code-lang">bash</div></div>
-            <pre><span class="cmd">kubectl</span> get all
-<span class="cmd">kubectl</span> get configmaps
-<span class="cmt"># You should only see the default "kubernetes" service</span>
-<span class="cmt"># and the "kube-root-ca.crt" configmap</span></pre>
+            <pre><span class="cmd">kubectl</span> delete namespace lab
+
+<span class="cmt"># Verify everything is gone</span>
+<span class="cmd">kubectl</span> get all <span class="flag">-n</span> lab
+<span class="out">No resources found in lab namespace.</span></pre>
           </div>
         </div>
       </div>

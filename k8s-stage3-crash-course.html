@@ -1503,17 +1503,50 @@ my-pvc   Bound    pvc-abc123   5Gi        RWO</span></pre>
           <p>Add liveness and readiness probes to see how K8s responds to failure.</p>
           <div class="code-block" style="margin-top:0.75rem">
             <div class="code-header"><div class="code-dots"><span></span><span></span><span></span></div><div class="code-lang">bash</div></div>
-            <pre><span class="cmt"># Deploy nginx with health probes</span>
+            <pre><span class="cmt"># Deploy nginx</span>
 <span class="cmd">kubectl</span> create deployment webapp <span class="flag">--image=nginx</span> <span class="flag">-n</span> lab
 
-<span class="cmt"># Edit and add probes</span>
-<span class="cmd">kubectl</span> edit deployment webapp <span class="flag">-n</span> lab
+<span class="cmt"># Edit and add probes (this opens your $EDITOR)</span>
+<span class="cmd">kubectl</span> edit deployment webapp <span class="flag">-n</span> lab</pre>
+          </div>
 
-<span class="cmt"># Watch pod restarts after probe failure</span>
+          <p>In the editor, find the <code style="font-family:'JetBrains Mono',monospace;color:var(--accent3)">containers</code> section and add the probes below. Nginx serves on port 80, so we use HTTP GET checks against <code style="font-family:'JetBrains Mono',monospace;color:var(--accent3)">/</code>:</p>
+
+          <div class="code-block" style="margin-top:0.75rem">
+            <div class="code-header"><div class="code-dots"><span></span><span></span><span></span></div><div class="code-lang">yaml · add inside spec.containers[0]</div></div>
+            <pre><span class="key">ports</span>:
+- <span class="key">containerPort</span>: <span class="num">80</span>
+<span class="key">livenessProbe</span>:
+  <span class="key">httpGet</span>:
+    <span class="key">path</span>: <span class="str">/</span>
+    <span class="key">port</span>: <span class="num">80</span>
+  <span class="key">initialDelaySeconds</span>: <span class="num">5</span>    <span class="cmt"># wait 5s before first check</span>
+  <span class="key">periodSeconds</span>: <span class="num">10</span>         <span class="cmt"># check every 10s</span>
+  <span class="key">failureThreshold</span>: <span class="num">3</span>       <span class="cmt"># 3 failures → restart container</span>
+<span class="key">readinessProbe</span>:
+  <span class="key">httpGet</span>:
+    <span class="key">path</span>: <span class="str">/</span>
+    <span class="key">port</span>: <span class="num">80</span>
+  <span class="key">initialDelaySeconds</span>: <span class="num">3</span>
+  <span class="key">periodSeconds</span>: <span class="num">5</span>
+  <span class="key">failureThreshold</span>: <span class="num">2</span>       <span class="cmt"># 2 failures → remove from Service</span></pre>
+          </div>
+
+          <div class="callout tip" style="margin-top:1rem">
+            <div class="callout-label">💡 Experiment</div>
+            <p>Try changing the readiness path to <code style="font-family:'JetBrains Mono',monospace;color:var(--accent3)">/nonexistent</code> — the pod will go <code style="font-family:'JetBrains Mono',monospace;color:var(--accent3)">0/1 READY</code> and be removed from Service endpoints (<code style="font-family:'JetBrains Mono',monospace;color:var(--accent3)">kubectl get endpoints webapp -n lab</code>). Change the liveness path to see a full restart cycle.</p>
+          </div>
+
+          <div class="code-block" style="margin-top:0.75rem">
+            <div class="code-header"><div class="code-dots"><span></span><span></span><span></span></div><div class="code-lang">bash · verify</div></div>
+            <pre><span class="cmt"># K8s auto-triggers a rolling update after the edit — watch it</span>
 <span class="cmd">kubectl</span> get pods <span class="flag">-n</span> lab <span class="flag">-w</span>
 
-<span class="cmt"># Describe to see probe events</span>
-<span class="cmd">kubectl</span> describe pod &lt;pod-name&gt; <span class="flag">-n</span> lab</pre>
+<span class="cmt"># Check probe events on the new pod</span>
+<span class="cmd">kubectl</span> describe pod &lt;pod-name&gt; <span class="flag">-n</span> lab
+
+<span class="cmt"># Verify endpoints (pod IP should be listed when readiness passes)</span>
+<span class="cmd">kubectl</span> get endpoints webapp <span class="flag">-n</span> lab</pre>
           </div>
         </div>
       </div>
@@ -1523,14 +1556,52 @@ my-pvc   Bound    pvc-abc123   5Gi        RWO</span></pre>
         <div class="step-content">
           <h4>Set Resource Limits + LimitRange</h4>
           <p>Apply a LimitRange to the namespace and observe quota enforcement.</p>
+
+          <p>First, create a <code style="font-family:'JetBrains Mono',monospace;color:var(--accent3)">limitrange.yaml</code> file with the following content:</p>
+
+          <div class="code-block" style="margin-top:0.75rem">
+            <div class="code-header"><div class="code-dots"><span></span><span></span><span></span></div><div class="code-lang">yaml · limitrange.yaml</div></div>
+            <pre><span class="key">apiVersion</span>: <span class="str">v1</span>
+<span class="key">kind</span>: <span class="str">LimitRange</span>
+<span class="key">metadata</span>:
+  <span class="key">name</span>: <span class="str">default-limits</span>
+  <span class="key">namespace</span>: <span class="str">lab</span>
+<span class="key">spec</span>:
+  <span class="key">limits</span>:
+  - <span class="key">type</span>: <span class="str">Container</span>
+    <span class="key">default</span>:          <span class="cmt"># applied if not specified</span>
+      <span class="key">cpu</span>: <span class="str">"500m"</span>
+      <span class="key">memory</span>: <span class="str">"256Mi"</span>
+    <span class="key">defaultRequest</span>:
+      <span class="key">cpu</span>: <span class="str">"100m"</span>
+      <span class="key">memory</span>: <span class="str">"128Mi"</span>
+    <span class="key">max</span>:              <span class="cmt"># hard ceiling</span>
+      <span class="key">cpu</span>: <span class="str">"2"</span>
+      <span class="key">memory</span>: <span class="str">"2Gi"</span></pre>
+          </div>
+
+          <p>Then apply it and test the enforcement:</p>
+
           <div class="code-block" style="margin-top:0.75rem">
             <div class="code-header"><div class="code-dots"><span></span><span></span><span></span></div><div class="code-lang">bash</div></div>
             <pre><span class="cmd">kubectl</span> apply <span class="flag">-f</span> limitrange.yaml <span class="flag">-n</span> lab
 <span class="cmd">kubectl</span> describe limitrange <span class="flag">-n</span> lab
 
 <span class="cmt"># Try to deploy a container exceeding the limit — should be rejected</span>
-<span class="cmd">kubectl</span> run toobig <span class="flag">--image=nginx</span> <span class="flag">-n</span> lab \
-  <span class="flag">--limits='cpu=10,memory=100Gi'</span>
+<span class="cmd">kubectl</span> apply <span class="flag">-n</span> lab <span class="flag">-f</span> - <span class="str">&lt;&lt;EOF</span>
+<span class="key">apiVersion</span>: <span class="str">v1</span>
+<span class="key">kind</span>: <span class="str">Pod</span>
+<span class="key">metadata</span>:
+  <span class="key">name</span>: <span class="str">toobig</span>
+<span class="key">spec</span>:
+  <span class="key">containers</span>:
+  - <span class="key">name</span>: <span class="str">toobig</span>
+    <span class="key">image</span>: <span class="str">nginx</span>
+    <span class="key">resources</span>:
+      <span class="key">limits</span>:
+        <span class="key">cpu</span>: <span class="str">"10"</span>
+        <span class="key">memory</span>: <span class="str">"100Gi"</span>
+<span class="str">EOF</span>
 <span class="out">Error: pods "toobig" is forbidden: maximum memory usage per Container is 2Gi</span></pre>
           </div>
         </div>
@@ -1541,16 +1612,46 @@ my-pvc   Bound    pvc-abc123   5Gi        RWO</span></pre>
         <div class="step-content">
           <h4>Create an Ingress</h4>
           <p>Expose the webapp via an Ingress rule with a hostname.</p>
+
+          <p>First, create an <code style="font-family:'JetBrains Mono',monospace;color:var(--accent3)">ingress.yaml</code> file:</p>
+
+          <div class="code-block" style="margin-top:0.75rem">
+            <div class="code-header"><div class="code-dots"><span></span><span></span><span></span></div><div class="code-lang">yaml · ingress.yaml</div></div>
+            <pre><span class="key">apiVersion</span>: <span class="str">networking.k8s.io/v1</span>
+<span class="key">kind</span>: <span class="str">Ingress</span>
+<span class="key">metadata</span>:
+  <span class="key">name</span>: <span class="str">my-ingress</span>
+  <span class="key">namespace</span>: <span class="str">lab</span>
+<span class="key">spec</span>:
+  <span class="key">ingressClassName</span>: <span class="str">nginx</span>
+  <span class="key">rules</span>:
+  - <span class="key">host</span>: <span class="str">myapp.local</span>
+    <span class="key">http</span>:
+      <span class="key">paths</span>:
+      - <span class="key">path</span>: <span class="str">/</span>
+        <span class="key">pathType</span>: <span class="str">Prefix</span>
+        <span class="key">backend</span>:
+          <span class="key">service</span>:
+            <span class="key">name</span>: <span class="str">webapp</span>
+            <span class="key">port</span>:
+              <span class="key">number</span>: <span class="num">80</span></pre>
+          </div>
+
+          <p>Then expose the Service, apply the Ingress, and test:</p>
+
           <div class="code-block" style="margin-top:0.75rem">
             <div class="code-header"><div class="code-dots"><span></span><span></span><span></span></div><div class="code-lang">bash</div></div>
             <pre><span class="cmt"># Expose service first</span>
 <span class="cmd">kubectl</span> expose deployment webapp <span class="flag">--port=80</span> <span class="flag">-n</span> lab
 
 <span class="cmt"># Apply ingress</span>
-<span class="cmd">kubectl</span> apply <span class="flag">-f</span> ingress.yaml <span class="flag">-n</span> lab
+<span class="cmd">kubectl</span> apply <span class="flag">-f</span> ingress.yaml
 
-<span class="cmt"># Add to /etc/hosts</span>
-<span class="cmd">echo</span> <span class="str">"$(minikube ip) myapp.local"</span> | sudo tee <span class="flag">-a</span> /etc/hosts
+<span class="cmt"># If using Docker driver on macOS, start tunnel in a separate terminal</span>
+<span class="cmd">minikube</span> tunnel
+
+<span class="cmt"># Add to /etc/hosts (use 127.0.0.1 with Docker driver + tunnel)</span>
+<span class="cmd">echo</span> <span class="str">"127.0.0.1 myapp.local"</span> | sudo tee <span class="flag">-a</span> /etc/hosts
 
 <span class="cmt"># Test</span>
 <span class="cmd">curl</span> http://myapp.local
@@ -1661,6 +1762,29 @@ my-pvc   Bound    pvc-abc123   5Gi        RWO</span></pre>
           <button class="quiz-opt" onclick="answer(this, false)">They are identical, just named differently</button>
         </div>
       </div>
+    </div>
+
+    <h3>// Lab Cleanup</h3>
+    <p>When you're done experimenting, clean up all the resources created during this lab.</p>
+
+    <div class="code-block" style="margin-top:0.75rem">
+      <div class="code-header"><div class="code-dots"><span></span><span></span><span></span></div><div class="code-lang">bash · cleanup</div></div>
+      <pre><span class="cmt"># Delete the entire lab namespace (removes all resources inside it)</span>
+<span class="cmd">kubectl</span> delete namespace lab
+
+<span class="cmt"># Remove the /etc/hosts entry</span>
+<span class="cmd">sudo</span> sed -i '' '/myapp.local/d' /etc/hosts
+
+<span class="cmt"># Stop minikube tunnel (if running, Ctrl+C in that terminal)</span>
+
+<span class="cmt"># Verify everything is gone</span>
+<span class="cmd">kubectl</span> get all <span class="flag">-n</span> lab
+<span class="out">No resources found in lab namespace.</span></pre>
+    </div>
+
+    <div class="callout warn">
+      <div class="callout-label">⚠️ Note</div>
+      <p>Deleting the namespace removes <strong>everything</strong> inside it — Deployments, Services, Ingress, CronJobs, LimitRanges, RoleBindings, and PVCs. It's the cleanest way to tear down a lab environment. If you want to keep the namespace but remove individual resources, use <code style="font-family:'JetBrains Mono',monospace;color:var(--accent3)">kubectl delete &lt;resource&gt; &lt;name&gt; -n lab</code> instead.</p>
     </div>
 
     <div class="callout tip">
