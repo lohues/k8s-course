@@ -1,0 +1,36 @@
+<svg width="140" height="140" viewBox="0 0 140 140" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#1a3a7c"/>
+      <stop offset="100%" stop-color="#060f2a"/>
+    </linearGradient>
+  </defs>
+  <!-- Rounded square background -->
+  <rect width="140" height="140" rx="32" fill="url(#bg)"/>
+  <!-- Hexagon outline (K8s motif) -->
+  <polygon points="70,10 120,38 120,102 70,130 20,102 20,38"
+    fill="none" stroke="#326ce5" stroke-width="3" stroke-linejoin="round" opacity="0.5"/>
+  <!-- Helm wheel ring -->
+  <circle cx="70" cy="70" r="30" stroke="#326ce5" stroke-width="4" fill="none"/>
+  <!-- Center hub -->
+  <circle cx="70" cy="70" r="8" fill="#326ce5"/>
+  <circle cx="70" cy="70" r="3" fill="white"/>
+  <!-- 8 spokes -->
+  <line x1="70" y1="24" x2="70" y2="40" stroke="white" stroke-width="4" stroke-linecap="round"/>
+  <line x1="70" y1="100" x2="70" y2="116" stroke="white" stroke-width="4" stroke-linecap="round"/>
+  <line x1="24" y1="70" x2="40" y2="70" stroke="white" stroke-width="4" stroke-linecap="round"/>
+  <line x1="100" y1="70" x2="116" y2="70" stroke="white" stroke-width="4" stroke-linecap="round"/>
+  <line x1="37" y1="37" x2="48" y2="48" stroke="white" stroke-width="4" stroke-linecap="round"/>
+  <line x1="92" y1="92" x2="103" y2="103" stroke="white" stroke-width="4" stroke-linecap="round"/>
+  <line x1="103" y1="37" x2="92" y2="48" stroke="white" stroke-width="4" stroke-linecap="round"/>
+  <line x1="48" y1="92" x2="37" y2="103" stroke="white" stroke-width="4" stroke-linecap="round"/>
+  <!-- Handle knobs -->
+  <circle cx="70" cy="21" r="5" fill="#326ce5"/>
+  <circle cx="70" cy="119" r="5" fill="#326ce5"/>
+  <circle cx="21" cy="70" r="5" fill="#326ce5"/>
+  <circle cx="119" cy="70" r="5" fill="#326ce5"/>
+  <circle cx="33" cy="33" r="5" fill="#326ce5"/>
+  <circle cx="107" cy="107" r="5" fill="#326ce5"/>
+  <circle cx="107" cy="33" r="5" fill="#326ce5"/>
+  <circle cx="33" cy="107" r="5" fill="#326ce5"/>
+</svg>

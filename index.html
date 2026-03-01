@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Kubernetes Crash Course</title>
+<link rel="icon" type="image/svg+xml" href="assets/logo.svg">
 <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;600;700&family=Syne:wght@400;600;700;800&display=swap" rel="stylesheet">
 <style>
   :root {
@@ -67,12 +68,14 @@
     width: 36px;
     height: 36px;
     border-radius: 10px;
-    background: linear-gradient(135deg, var(--accent2), var(--accent3));
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 1.1rem;
+    overflow: hidden;
     flex-shrink: 0;
+  }
+
+  .sidebar-header .logo-icon img {
+    width: 100%;
+    height: 100%;
+    display: block;
   }
 
   .sidebar-header h1 {
@@ -303,13 +306,16 @@
     width: 80px;
     height: 80px;
     border-radius: 20px;
-    background: linear-gradient(135deg, var(--accent2), var(--accent3));
+    overflow: hidden;
     display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 2.2rem;
     margin-bottom: 2rem;
     box-shadow: 0 0 60px rgba(0,212,255,0.15);
+  }
+
+  .welcome-icon img {
+    width: 100%;
+    height: 100%;
+    display: block;
   }
 
   .welcome h2 {
@@ -412,7 +418,7 @@
 <aside class="sidebar" id="sidebar">
   <div class="sidebar-header">
     <div class="logo" onclick="showWelcome()">
-      <div class="logo-icon">&#9781;</div>
+      <div class="logo-icon"><img src="assets/logo.svg" alt="Kubernetes logo"></div>
       <h1>Kubernetes<span>Crash Course &middot; 5 Stages</span></h1>
     </div>
   </div>
@@ -440,7 +446,7 @@
 
   <div class="welcome" id="welcomeScreen">
     <div class="welcome-inner">
-      <div class="welcome-icon">&#9781;</div>
+      <div class="welcome-icon"><img src="assets/logo.svg" alt="Kubernetes logo"></div>
       <h2>Kubernetes Crash Course</h2>
       <p>A comprehensive, hands-on journey from zero to production-ready Kubernetes across 5 progressive stages. Pick a stage to begin, or start from Stage 1 if you're new.</p>
       <div class="stage-cards" id="stageCards"></div>
