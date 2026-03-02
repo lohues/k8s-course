@@ -488,12 +488,12 @@ const STAGES = [
     color: '#f97316',
     desc: 'Linux, Docker, Networking, YAML & CLI fundamentals',
     sections: [
-      'Linux Basics',
-      'Docker & Containers',
-      'Networking Fundamentals',
-      'YAML',
-      'CLI Productivity',
-      'Hands-On Lab'
+      { name: 'Linux Basics', id: 'linux' },
+      { name: 'Docker & Containers', id: 'docker' },
+      { name: 'Networking Fundamentals', id: 'networking' },
+      { name: 'YAML', id: 'yaml' },
+      { name: 'CLI Productivity', id: 'cli' },
+      { name: 'Hands-On Lab', id: 'hands-on' }
     ]
   },
   {
@@ -503,13 +503,13 @@ const STAGES = [
     color: '#00d4ff',
     desc: 'Pods, Deployments, Services, kubectl & ConfigMaps',
     sections: [
-      'Why Kubernetes?',
-      'Cluster Architecture',
-      'Core Kubernetes Objects',
-      'The kubectl CLI',
-      'ConfigMaps & Secrets',
-      'Labels, Selectors & Annotations',
-      'Hands-On Lab'
+      { name: 'Why Kubernetes?', id: 'why' },
+      { name: 'Cluster Architecture', id: 'architecture' },
+      { name: 'Core Kubernetes Objects', id: 'objects' },
+      { name: 'The kubectl CLI', id: 'kubectl' },
+      { name: 'ConfigMaps & Secrets', id: 'config' },
+      { name: 'Labels, Selectors & Annotations', id: 'labels' },
+      { name: 'Hands-On Lab', id: 'hands-on' }
     ]
   },
   {
@@ -519,14 +519,14 @@ const STAGES = [
     color: '#7c3aed',
     desc: 'Scheduling, Storage, Ingress, Workloads, RBAC & Probes',
     sections: [
-      'Scheduling',
-      'Storage: PV, PVC & StorageClass',
-      'Networking & Ingress',
-      'Workload Types',
-      'Health Probes',
-      'Resource Management',
-      'RBAC',
-      'Hands-On Lab'
+      { name: 'Scheduling', id: 'scheduling' },
+      { name: 'Storage: PV, PVC & StorageClass', id: 'storage' },
+      { name: 'Networking & Ingress', id: 'networking' },
+      { name: 'Workload Types', id: 'workloads' },
+      { name: 'Health Probes', id: 'probes' },
+      { name: 'Resource Management', id: 'resources' },
+      { name: 'RBAC', id: 'rbac' },
+      { name: 'Hands-On Lab', id: 'hands-on' }
     ]
   },
   {
@@ -536,14 +536,14 @@ const STAGES = [
     color: '#2dd4bf',
     desc: 'Helm, CI/CD, ArgoCD, Monitoring & Auto-Scaling',
     sections: [
-      'Helm',
-      'CI/CD Integration',
-      'GitOps with ArgoCD',
-      'Monitoring & Logging',
-      'Auto-Scaling: HPA & VPA',
-      'Multi-Environment Management',
-      'Managed Kubernetes',
-      'Hands-On Lab'
+      { name: 'Helm', id: 'helm' },
+      { name: 'CI/CD Integration', id: 'cicd' },
+      { name: 'GitOps with ArgoCD', id: 'gitops' },
+      { name: 'Monitoring & Logging', id: 'monitoring' },
+      { name: 'Auto-Scaling: HPA & VPA', id: 'autoscaling' },
+      { name: 'Multi-Environment Management', id: 'multienv' },
+      { name: 'Managed Kubernetes', id: 'managed' },
+      { name: 'Hands-On Lab', id: 'hands-on' }
     ]
   },
   {
@@ -553,14 +553,14 @@ const STAGES = [
     color: '#c084fc',
     desc: 'kubeadm, CRDs, Istio, Security, etcd & Multi-Cluster',
     sections: [
-      'Cluster Bootstrap with kubeadm',
-      'CRDs & Operators',
-      'Service Mesh with Istio',
-      'Advanced Security Hardening',
-      'etcd Operations',
-      'Multi-Cluster Management',
-      'Advanced Debugging Techniques',
-      'Hands-On Lab'
+      { name: 'Cluster Bootstrap with kubeadm', id: 'kubeadm' },
+      { name: 'CRDs & Operators', id: 'crd' },
+      { name: 'Service Mesh with Istio', id: 'servicemesh' },
+      { name: 'Advanced Security Hardening', id: 'security' },
+      { name: 'etcd Operations', id: 'etcd' },
+      { name: 'Multi-Cluster Management', id: 'multicluster' },
+      { name: 'Advanced Debugging Techniques', id: 'debugging' },
+      { name: 'Hands-On Lab', id: 'hands-on' }
     ]
   }
 ];
@@ -584,7 +584,7 @@ function buildSidebar() {
       </button>
       <div class="stage-sections" id="stageSections${s.id}">
         ${s.sections.map((sec, i) => `
-          <a class="section-link" onclick="loadStage(${s.id})" data-stage="${s.id}" data-section="${i}">${sec}</a>
+          <a class="section-link" onclick="loadStage(${s.id}, '${sec.id}')" data-stage="${s.id}" data-section="${sec.id}">${sec.name}</a>
         `).join('')}
       </div>
     </div>
@@ -605,7 +605,14 @@ function toggleStage(id) {
   }
 }
 
-function loadStage(id) {
+function expandStage(id) {
+  document.querySelectorAll('.stage-sections').forEach(s => s.classList.remove('open'));
+  document.querySelectorAll('.stage-btn').forEach(b => b.classList.remove('expanded'));
+  document.getElementById(`stageSections${id}`).classList.add('open');
+  document.getElementById(`stageBtn${id}`).classList.add('expanded');
+}
+
+function loadStage(id, sectionId) {
   const stage = STAGES.find(s => s.id === id);
   if (!stage) return;
   currentStage = id;
@@ -617,13 +624,17 @@ function loadStage(id) {
   document.getElementById('welcomeScreen').style.display = 'none';
   const frame = document.getElementById('contentFrame');
   frame.style.display = 'block';
-  frame.src = stage.file;
+  frame.src = stage.file + (sectionId ? '#' + sectionId : '');
   document.getElementById('topbarTitle').textContent = `Stage ${id} — ${stage.title}`;
 
   document.querySelectorAll('.stage-btn').forEach(b => b.classList.remove('active'));
   document.getElementById(`stageBtn${id}`).classList.add('active');
 
-  toggleStage(id);
+  document.querySelectorAll('.section-link').forEach(l => l.classList.remove('active'));
+  const activeLink = document.querySelector(`.section-link[data-stage="${id}"][data-section="${sectionId || ''}"]`);
+  if (activeLink) activeLink.classList.add('active');
+
+  expandStage(id);
   updateNavBtns();
   closeMobile();
 }
@@ -634,6 +645,7 @@ function showWelcome() {
   document.getElementById('contentFrame').style.display = 'none';
   document.getElementById('topbarTitle').textContent = 'Home';
   document.querySelectorAll('.stage-btn').forEach(b => b.classList.remove('active'));
+  document.querySelectorAll('.section-link').forEach(l => l.classList.remove('active'));
   updateNavBtns();
   closeMobile();
 }
@@ -669,7 +681,7 @@ function buildWelcomeCards() {
       <div class="card-stage" style="color:${s.color}">Stage ${s.id}</div>
       <div class="card-title">${s.title}</div>
       <div class="card-desc">${s.desc}</div>
-      <div class="card-sections">${s.sections.length} sections</div>
+      <div class="card-sections">${s.sections.length} section${s.sections.length !== 1 ? 's' : ''}</div>
     </div>
   `).join('');
 }
